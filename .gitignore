@@ -24,6 +24,15 @@
 .obsidian/core-plugins-migration.json
 .obsidian/hotkeys.json
 
+# Python virtual environment
+.venv/
+
+# Claude local settings
+.claude/
+
+# Nested vault artifacts
+Warren/
+
 # OS files
 .DS_Store
 Thumbs.db

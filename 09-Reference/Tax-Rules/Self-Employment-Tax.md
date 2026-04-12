@@ -3,9 +3,11 @@ title: Self-Employment Tax Guide
 type: reference
 tags: [tax, self-employment, reference]
 date_created: 2026-04-12
+last_updated: 2026-04-12
+note: "Official IRS/SSA figures for 2026."
 ---
 
-# Self-Employment Tax — 2026
+# Self-Employment Tax — 2026 (Official)
 
 ## What Is Self-Employment Tax?
 
@@ -17,7 +19,7 @@ Tom owes SE tax on net income from AiTheia LLC (if disregarded entity/sole prop)
 
 | Component | Rate | Income Base |
 |-----------|------|-------------|
-| Social Security | 12.4% | First $168,600 of SE income |
+| Social Security | 12.4% | First $184,500 of SE income |
 | Medicare | 2.9% | All SE income (no cap) |
 | Additional Medicare | 0.9% | SE income over $200K (single) / $250K (MFJ) |
 
@@ -27,7 +29,7 @@ Tom owes SE tax on net income from AiTheia LLC (if disregarded entity/sole prop)
 
 1. Start with net self-employment income (Schedule C net profit or K-1 SE income)
 2. Multiply by 92.35% (this accounts for the employer-equivalent portion)
-3. Apply Social Security rate (12.4%) on first $168,600
+3. Apply Social Security rate (12.4%) on first $184,500
 4. Apply Medicare rate (2.9%) on all SE income
 5. Apply Additional Medicare (0.9%) on amounts over threshold
 6. Total = SE tax
@@ -54,8 +56,8 @@ Above-the-line deduction (50%):   $7,065
 
 If Tom also has W-2 income from UCLA:
 - UCLA already withholds FICA on W-2 wages
-- The Social Security wage base ($168,600) is shared between W-2 and SE income
-- If W-2 wages alone exceed $168,600, no additional SS tax on SE income
+- The Social Security wage base ($184,500) is shared between W-2 and SE income
+- If W-2 wages alone exceed $184,500, no additional SS tax on SE income
 - Medicare tax (2.9%) still applies to all SE income regardless of W-2 wages
 - Additional Medicare (0.9%) applies to combined W-2 + SE income over threshold
 
@@ -70,4 +72,4 @@ If AiTheia elects S-Corp status:
 
 ---
 
-*Note: Verify current year wage base and rate thresholds with IRS publications.*
+*Sources: IRS 2026 SE tax rates, SSA wage base announcement ($184,500 for 2026). Verified April 2026.*

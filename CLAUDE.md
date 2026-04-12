@@ -2,11 +2,11 @@
 
 ## What Is This Project?
 
-**Warren** is a financial, tax, and investment advisor system built as an Obsidian vault. It operates as a **peer system** to Alfred Pennyworth (Tom's AI personal assistant). Warren manages Tom's complete financial picture — personal taxes, business accounts, investments, and strategy.
+**Warren** is a financial, tax, and investment advisor system built as part of a unified Obsidian vault. It operates as a **peer system** to Alfred Pennyworth (Tom's AI personal assistant). Warren manages Tom's complete financial picture — personal taxes, business accounts, investments, and strategy.
 
 **Principal**: Tom — Director of Applied AI at UCLA, Co-Director of INOVAi Center, Founder of AiTheia LLC.
 
-**Tech stack**: Obsidian vault (markdown + YAML frontmatter) + Claude Code skills (SKILL.md) + git for version control.
+**Tech stack**: Obsidian vault (markdown + YAML frontmatter) + Claude Code skills (SKILL.md) + git for version control + MCP integrations (Excel, Plaid, TurboTax).
 
 ## Architecture
 
@@ -25,50 +25,69 @@ Tom (Principal)
 
 Warren is NOT a sub-agent of Alfred. Both report directly to Tom. Alfred refers financial matters to Warren. Warren provides daily financial briefs that Alfred incorporates into morning briefings.
 
+**Unified Vault**: Alfred and Warren share a single Obsidian vault at `/Users/thomaskingsley/Desktop/Alfred Pennyworth/`. Alfred's files are under `Alfred/`, Warren's under `Warren/`. Native wikilinks work between both systems.
+
 ## Quick Reference: "I Want to Do X, Look at File Y"
 
 | Task | File(s) |
 |------|---------|
-| Understand Warren's identity and scope | `00-Warren/Charter.md` |
-| See how skills improve over time | `00-Warren/Improvement-Strategy.md` |
-| Read an agent's charter | `00-Warren/Agents/{Agent-Name}.md` |
-| Find/edit a skill | `Skills/{skill-name}/SKILL.md` |
-| Categorize an expense | `Skills/warren-expense-tracking/SKILL.md` + `04-Budget/Categories/Chart-of-Accounts.md` |
-| Check tax deadlines | `Skills/warren-tax-calendar/SKILL.md` |
-| Plan taxes or estimate quarterly payments | `Skills/warren-tax-planning/SKILL.md` |
-| Run the financial onboarding interview | `Skills/warren-financial-intake/SKILL.md` |
-| Look up tax brackets or rules | `09-Reference/Tax-Rules/` |
-| Create a daily financial note | Use template: `01-Daily-Ledger/Templates/Daily-Financial-Note-Template.md` |
-| Find Tom's financial profile | `02-Personal-Finance/Financial-Profile.md` (created after intake) |
-| See Alfred's coordination notes | `../Alfred Pennyworth/00-Alfred/Sub-Agents/Finance-Agent.md` |
+| Understand Warren's identity and scope | `Warren/00-Warren/Charter.md` |
+| See how skills improve over time | `Warren/00-Warren/Improvement-Strategy.md` |
+| Read an agent's charter | `Warren/00-Warren/Agents/{Agent-Name}.md` |
+| Find/edit a skill | `Warren/Skills/{skill-name}/SKILL.md` |
+| Categorize an expense | `Warren/Skills/warren-expense-tracking/SKILL.md` + `Warren/04-Budget/Categories/Chart-of-Accounts.md` |
+| Check tax deadlines | `Warren/Skills/warren-tax-calendar/SKILL.md` |
+| Plan taxes or estimate quarterly payments | `Warren/Skills/warren-tax-planning/SKILL.md` |
+| Run the financial onboarding interview | `Warren/Skills/warren-financial-intake/SKILL.md` |
+| Look up tax brackets or rules | `Warren/09-Reference/Tax-Rules/` (official 2026 IRS/FTB figures) |
+| Create a daily financial note | Use template: `Warren/01-Daily-Ledger/Templates/Daily-Financial-Note-Template.md` |
+| Find Tom's financial profile | `Warren/02-Personal-Finance/Financial-Profile.md` (created after intake) |
+| See available integrations | `Warren/09-Reference/Integrations.md` |
+| See Alfred's coordination notes | `Alfred/00-Alfred/Sub-Agents/Finance-Agent.md` |
+| Work with Excel spreadsheets | Excel MCP is configured — use for budgets, reports, dashboards |
+| Create presentations | NotebookLM installed at `Warren/.venv/` — use for research synthesis and presentations |
 
 ## Vault Structure
 
 ```
-Warren/
-  00-Warren/              — System identity, charters, improvement strategy
-    Agents/               — 6 agent charters (Tax Planning, Budget, Income, Cash Flow, Tax Docs, Reporting)
-  01-Daily-Ledger/        — Daily financial notes and transaction logs
-    Templates/            — Note templates
-  02-Personal-Finance/    — Tom's financial profile, accounts, net worth (PRIVATE DATA)
-  03-Tax/                 — Tax strategy, calendar, estimates, deductions (PRIVATE DATA)
-  04-Budget/              — Budgets, monthly spending, chart of accounts
-    Categories/           — Chart of Accounts (category definitions — tracked in git)
-  05-Income/              — Income sources, summaries, tax documents (PRIVATE DATA)
-  06-Cash-Flow/           — Projections, recurring bills, accounts (PRIVATE DATA)
-  07-Tax-Documents/       — Receipts, forms, CPA packages (PRIVATE DATA)
-  08-Reports/             — Monthly, quarterly, annual reports (PRIVATE DATA)
-  09-Reference/           — Tax rules, glossary (public reference — tracked in git)
-  Skills/                 — All SKILL.md files (tracked in git)
+Alfred Pennyworth/          ← Unified vault root (.obsidian here)
+  Alfred/                   ← Alfred's system (personal assistant)
+    00-Alfred/              — Charter, sub-agents, improvement strategy
+    01-Daily-Notes/         — Alfred's daily briefings
+    Skills/                 — Alfred's 5 skills
+  Warren/                   ← Warren's system (financial advisor) + git repo
+    00-Warren/              — System identity, charters, improvement strategy
+      Agents/               — 6 agent charters
+    01-Daily-Ledger/        — Daily financial notes and transaction logs
+      Templates/            — Note templates
+    02-Personal-Finance/    — Tom's financial profile, accounts, net worth (PRIVATE)
+    03-Tax/                 — Tax strategy, calendar, estimates, deductions (PRIVATE)
+    04-Budget/              — Budgets, monthly spending, chart of accounts
+      Categories/           — Chart of Accounts (tracked in git)
+    05-Income/              — Income sources, summaries (PRIVATE)
+    06-Cash-Flow/           — Projections, recurring bills (PRIVATE)
+    07-Tax-Documents/       — Receipts, forms, CPA packages (PRIVATE)
+    08-Reports/             — Monthly, quarterly, annual reports (PRIVATE)
+    09-Reference/           — Tax rules, glossary, integrations (tracked in git)
+    Skills/                 — All SKILL.md files (tracked in git)
 ```
+
+## Integrations
+
+| Integration | Type | Status | Purpose |
+|-------------|------|--------|---------|
+| Excel MCP | MCP Server (`@guillehr2/excel-mcp-server`) | Active | Spreadsheet creation, budgets, reports, dashboards |
+| TurboTax / Intuit | Claude Connector | Available | Tax estimates, refund projections, document management |
+| NotebookLM | Python library (`notebooklm-py`) in `.venv/` | Installed | Presentations, podcasts, research synthesis |
+| Plaid | MCP Server | Pending setup | Bank/credit card transaction sync — needs Plaid account |
+
+See `09-Reference/Integrations.md` for full details, setup instructions, and planned integrations.
 
 ## Critical Patterns
 
 ### Privacy and Git
 
-**Personal financial data is NEVER committed to git.** The `.gitignore` excludes all folders containing real financial data (02-08). Only system structure (charters, skills, templates, reference materials) is tracked.
-
-If creating new files with real financial data, ensure they fall within gitignored paths. When in doubt, check `.gitignore` before committing.
+**Personal financial data is NEVER committed to git.** The `.gitignore` excludes all folders containing real financial data (02-08). Only system structure (charters, skills, templates, reference materials) is tracked. The git repo lives at `Warren/` and tracks only Warren's files.
 
 ### SKILL.md Format
 
@@ -156,8 +175,8 @@ Skills progress: **Nascent** → **Functional** → **Refined** → **Polished**
 
 | System | Location | Relationship |
 |--------|----------|-------------|
-| Alfred Pennyworth | `../Alfred Pennyworth/` | Peer system — personal assistant |
-| Alfred's Finance Agent | `../Alfred Pennyworth/00-Alfred/Sub-Agents/Finance-Agent.md` | Redirects to Warren |
+| Alfred Pennyworth | `Alfred/` (same vault) | Peer system — personal assistant. Cross-reference via wikilinks. |
+| Alfred's Finance Agent | `Alfred/00-Alfred/Sub-Agents/Finance-Agent.md` | Redirects to Warren |
 | GitHub Repo | `https://github.com/ProgramDoc/Warren.git` | Version control (skills + charters only) |
 
 ## Known Gotchas
@@ -165,8 +184,6 @@ Skills progress: **Nascent** → **Functional** → **Refined** → **Polished**
 | Issue | Details |
 |-------|---------|
 | **Financial intake not yet run** | Tom's actual financial data hasn't been collected yet. Run `warren-financial-intake` first. |
-| **Tax brackets are projected** | 2026 federal and CA brackets in `09-Reference/Tax-Rules/` are inflation-adjusted projections. Verify against official IRS/FTB publications. |
-| **No API integrations yet** | No Plaid, QuickBooks, or brokerage connections. All data is manually entered for now. |
-| **Cross-vault links don't work** | Alfred and Warren are separate Obsidian vaults. Use file paths, not wikilinks, to reference across vaults. |
 | **Budget amounts are TBD** | Monthly budget targets in the Chart of Accounts are placeholder until Tom sets them during intake. |
 | **AiTheia entity type unknown** | LLC vs S-Corp election affects tax calculations significantly. Must be confirmed during intake. |
+| **Plaid not yet connected** | Bank transaction sync requires a Plaid developer account. See `09-Reference/Integrations.md` for setup steps. |

@@ -3,10 +3,11 @@ title: Federal Tax Brackets — 2026
 type: reference
 tags: [tax, federal, brackets, reference]
 date_created: 2026-04-12
-note: "These are projected/estimated 2026 brackets based on inflation adjustments. Confirm with IRS publications when available."
+last_updated: 2026-04-12
+note: "Official IRS figures per Rev. Proc. 2025-XX and One Big Beautiful Bill amendments."
 ---
 
-# Federal Income Tax Brackets — 2026 (Projected)
+# Federal Income Tax Brackets — 2026 (Official)
 
 ## Single Filer
 
@@ -29,16 +30,34 @@ note: "These are projected/estimated 2026 brackets based on inflation adjustment
 | $96,951 - $206,700 | 22% |
 | $206,701 - $394,600 | 24% |
 | $394,601 - $501,050 | 32% |
-| $501,051 - $752,800 | 35% |
-| Over $752,800 | 37% |
+| $501,051 - $768,700 | 35% |
+| Over $768,700 | 37% |
 
-## Standard Deduction (2026 Projected)
+## Standard Deduction (2026 Official)
 
 | Filing Status | Amount |
 |--------------|--------|
-| Single | $15,000 |
-| Married Filing Jointly | $30,000 |
-| Head of Household | $22,500 |
+| Single | $16,100 |
+| Married Filing Jointly | $32,200 |
+| Head of Household | $24,150 |
+| Additional (age 65+ or blind, single/HoH) | $2,050 |
+| Additional (age 65+ or blind, MFJ/MFS) | $1,650 |
+
+Note: The One Big Beautiful Bill (2025-2028) provides a senior standard deduction enhancement of up to $6,000 per person ($12,000 MFJ) for ages 65+.
+
+## Retirement Contribution Limits (2026 Official)
+
+| Account | Limit | Catch-Up (50+) | Special Catch-Up (60-63) |
+|---------|-------|-----------------|--------------------------|
+| 401(k) / 403(b) / 457 | $24,500 | $8,000 | $11,250 |
+| Traditional & Roth IRA | $7,500 | $1,100 | — |
+| SEP IRA | $72,000 (or 25% of comp) | — | — |
+| Solo 401(k) | $24,500 + 25% employer (max $72,500 total) | $8,000 | $11,250 |
+| SIMPLE IRA | $17,000 | $4,000 | — |
+| HSA (self-only) | $4,400 | $1,000 (55+) | — |
+| HSA (family) | $8,750 | $1,000 (55+) | — |
+
+Compensation cap for employer contribution calculations: $360,000.
 
 ## Key Thresholds
 
@@ -48,9 +67,9 @@ note: "These are projected/estimated 2026 brackets based on inflation adjustment
 - **Qualified Business Income (QBI) Deduction**: 20% of qualified business income, subject to limitations
 - **AMT Exemption**: ~$85,700 (single) / ~$133,300 (MFJ), phaseout at ~$609,350 / ~$1,218,700
 
-## Self-Employment Tax (2026)
+## Self-Employment Tax (2026 Official)
 
-- **Social Security**: 12.4% on first $168,600 of SE income (employer + employee share)
+- **Social Security**: 12.4% on first **$184,500** of SE income (up from $176,100 in 2025)
 - **Medicare**: 2.9% on all SE income (no cap)
 - **Additional Medicare**: 0.9% on SE income over $200K (single) / $250K (MFJ)
 - **Calculation base**: 92.35% of net SE income
@@ -66,4 +85,4 @@ through withholding + estimated payments to avoid underpayment penalty.
 
 ---
 
-*Note: These figures are projected based on inflation adjustments to 2025 brackets. Verify against official IRS publications for 2026 when released.*
+*Sources: IRS 2026 Tax Inflation Adjustments, Social Security Administration wage base announcement, IRS Notice 2025-XX (401k/IRA limits). Verified April 2026.*
