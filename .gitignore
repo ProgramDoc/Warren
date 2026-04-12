@@ -1,0 +1,29 @@
+# Personal financial data - NEVER commit
+01-Daily-Ledger/*.md
+!01-Daily-Ledger/Templates/
+02-Personal-Finance/
+03-Tax/Quarterly-Estimates/
+03-Tax/CPA-Communications/
+03-Tax/Tax-Strategy-*.md
+04-Budget/Monthly-Spending/
+04-Budget/Anomalies/
+04-Budget/Budget-*.md
+05-Income/
+06-Cash-Flow/
+07-Tax-Documents/Receipts/
+07-Tax-Documents/Forms/
+07-Tax-Documents/CPA-Package/
+08-Reports/
+09-Reference/Account-Numbers.md
+09-Reference/CPA-Contact-Info.md
+
+# Obsidian workspace (user-specific)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/plugins/
+.obsidian/core-plugins-migration.json
+.obsidian/hotkeys.json
+
+# OS files
+.DS_Store
+Thumbs.db
