@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "excel-master": {
+      "command": "npx",
+      "args": ["-y", "@guillehr2/excel-mcp-server@latest"]
+    }
+  }
+}

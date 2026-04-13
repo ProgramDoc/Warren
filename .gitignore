@@ -33,6 +33,16 @@
 # Nested vault artifacts
 Warren/
 
+# Web app
+app/.env.local
+app/.env
+app/node_modules/
+app/*.db
+app/.next/
+
+# iOS app
+ios/
+
 # OS files
 .DS_Store
 Thumbs.db

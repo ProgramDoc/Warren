@@ -161,11 +161,14 @@ Warren is plain-spoken, honest, and direct. Named in the spirit of Warren Buffet
 
 ## Tom's Financial Context
 
-- **UCLA**: W-2 employment income with withholding, 403(b) retirement plan available
-- **AiTheia LLC**: Pass-through business income (entity type to be confirmed during intake)
-- **California resident**: State income tax applies, $800 annual LLC fee, no preferential capital gains rate
-- **Multiple income streams**: Requires quarterly estimated tax payments
-- **Has a CPA**: Warren prepares, CPA files
+- **UCLA**: HS Asst Clinical Prof (HCOMP), Dept of Medicine Hospitalists. Base $186,900/month + Z payments (RVU) + moonlighting. Combined W-2 ~$350-400K.
+- **AiTheia LLC**: California-registered single-member LLC. 1099 consulting income ~$150K revenue, ~$100K net. No S-Corp election yet.
+- **SL (Wife)**: W-2 income, $330K gross annual. Filing MFJ.
+- **Filing**: Married Filing Jointly. Combined AGI ~$800K. 35% federal bracket.
+- **California resident**: Manhattan Beach, CA 90266. State income tax ~9.3% marginal.
+- **Properties**: Tampa condo ($1,500/month rent, no mortgage), Rochester ($2,900/month rent, $3,335 mortgage).
+- **Children**: Noah and Evie (childcare ~$3,200-3,700/month).
+- **Has a CPA**: Warren prepares, CPA files. 2025 extension filed.
 
 ## Skill Lifecycle
 
@@ -179,11 +182,46 @@ Skills progress: **Nascent** → **Functional** → **Refined** → **Polished**
 | Alfred's Finance Agent | `Alfred/00-Alfred/Sub-Agents/Finance-Agent.md` | Redirects to Warren |
 | GitHub Repo | `https://github.com/ProgramDoc/Warren.git` | Version control (skills + charters only) |
 
+## Web App (Phase 1)
+
+**Location:** `Warren/app/` — Next.js 16 + TypeScript + Tailwind
+**Hosting:** Render.com (Web Service + PostgreSQL)
+
+**Architecture:**
+```
+Browser/Phone → Render (HTTPS) → Next.js API → PostgreSQL
+                                              → AES-256-GCM encrypted fields
+Warren (Claude) → Vault (local markdown) ← manually synced → Cloud DB
+```
+
+**Auth:** Email + password (bcrypt 12 rounds), JWT sessions, rate-limited login
+**RBAC:** Owner (Tom) = full access | Household (wife) = shared budgets only
+**Encryption:** AES-256-GCM for sensitive database fields
+
+**Development Commands:**
+```bash
+cd Warren/app
+npm run dev        # Start dev server (localhost:3000)
+npm run build      # Production build
+```
+
+**Deploy to Render:**
+1. Push `app/` directory to GitHub
+2. Connect repo on Render Dashboard → New Web Service
+3. Render auto-detects `render.yaml` blueprint
+4. After deploy: `curl -X POST https://your-app.onrender.com/api/init -H "Authorization: Bearer $INIT_SECRET"`
+5. Then run seed.sql against the PostgreSQL database
+6. Visit the app → Setup page creates owner account
+
+**Environment:** `Warren/app/.env.local` (gitignored) — needs DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY
+
 ## Known Gotchas
 
 | Issue | Details |
 |-------|---------|
-| **Financial intake not yet run** | Tom's actual financial data hasn't been collected yet. Run `warren-financial-intake` first. |
-| **Budget amounts are TBD** | Monthly budget targets in the Chart of Accounts are placeholder until Tom sets them during intake. |
-| **AiTheia entity type unknown** | LLC vs S-Corp election affects tax calculations significantly. Must be confirmed during intake. |
-| **Plaid not yet connected** | Bank transaction sync requires a Plaid developer account. See `09-Reference/Integrations.md` for setup steps. |
+| **Financial intake partially complete** | Core profile built from paystubs + budget. Follow-up items: SL paystub, accounts list, CPA info. |
+| **Budget amounts are TBD** | Monthly budget targets in the Chart of Accounts are placeholder until Tom sets them. |
+| **AiTheia S-Corp not elected** | LLC vs S-Corp election affects tax calculations significantly. Discuss with CPA. |
+| **Plaid not yet connected** | Bank transaction sync requires a Plaid developer account. See `09-Reference/Integrations.md`. |
+| **App not yet deployed** | Render.com deployment pending. See `app/render.yaml` for blueprint. |
+| **No estimated tax payments** | AiTheia Q1 income $62K with $0 estimated taxes. April 15 deadline imminent. |

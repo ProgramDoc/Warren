@@ -17,8 +17,8 @@ Reference guide for all external tool integrations connected to or available for
 - **Package**: `@guillehr2/excel-mcp-server`
 - **Purpose**: Create, read, write Excel workbooks for financial tracking, budgets, reports, and dashboards
 - **Capabilities**: 30+ tools — cell operations, charts, formatting, CSV/JSON/PDF import/export, dashboard creation
-- **Config**: Added to `.claude/settings.local.json`
-- **Status**: Active
+- **Config**: Added to `.mcp.json` in project root
+- **Status**: Active — will load on next Claude Code session
 
 ### TurboTax / Intuit Connector
 - **Type**: Claude Connector (built-in, not MCP)
@@ -32,7 +32,8 @@ Reference guide for all external tool integrations connected to or available for
 - **Purpose**: Programmatic access to Google NotebookLM for presentations, podcasts, quizzes, and AI-powered research synthesis
 - **Usage**: CLI commands or Python API — call via shell in automation
 - **Requires**: Python 3.10+, Playwright + Chromium for auth
-- **Status**: Install when needed
+- **Status**: Installed in `Warren/.venv/` with Playwright + Chromium
+- **Activate**: `source Warren/.venv/bin/activate`
 
 ## Planned Integrations
 
