@@ -432,6 +432,113 @@ export async function moveConversationToProject(
   );
 }
 
+// --- Document operations ---
+
+export interface Document {
+  id: string;
+  user_id: string;
+  filename: string;
+  original_filename: string;
+  mime_type: string;
+  size_bytes: number;
+  r2_key: string;
+  category: string;
+  access_level: string;
+  conversation_id: string | null;
+  description: string | null;
+  deleted_at: string | null;
+  created_at: string;
+}
+
+export async function createDocument(
+  userId: string,
+  filename: string,
+  originalFilename: string,
+  mimeType: string,
+  sizeBytes: number,
+  r2Key: string,
+  category: string,
+  accessLevel: string,
+  conversationId?: string | null,
+  description?: string | null
+): Promise<Document> {
+  const result = await queryOne<Document>(
+    `INSERT INTO documents (user_id, filename, original_filename, mime_type, size_bytes, r2_key, category, access_level, conversation_id, description)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+    [userId, filename, originalFilename, mimeType, sizeBytes, r2Key, category, accessLevel, conversationId || null, description || null]
+  );
+  return result!;
+}
+
+export async function getDocuments(
+  userId: string,
+  role: string,
+  options?: { category?: string; conversationId?: string; limit?: number }
+): Promise<Document[]> {
+  const conditions = ["deleted_at IS NULL"];
+  const params: unknown[] = [];
+  let paramIdx = 1;
+
+  if (role === "household") {
+    conditions.push(`access_level = 'household'`);
+    conditions.push(`(user_id = $${paramIdx} OR EXISTS (SELECT 1 FROM users WHERE id = $${paramIdx}))`);
+    params.push(userId);
+    paramIdx++;
+  } else {
+    conditions.push(`user_id = $${paramIdx}`);
+    params.push(userId);
+    paramIdx++;
+  }
+
+  if (options?.category) {
+    conditions.push(`category = $${paramIdx}`);
+    params.push(options.category);
+    paramIdx++;
+  }
+
+  if (options?.conversationId) {
+    conditions.push(`conversation_id = $${paramIdx}`);
+    params.push(options.conversationId);
+    paramIdx++;
+  }
+
+  const limit = options?.limit || 50;
+  params.push(limit);
+
+  return query<Document>(
+    `SELECT * FROM documents WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC LIMIT $${paramIdx}`,
+    params
+  );
+}
+
+export async function getDocument(
+  documentId: string,
+  userId: string,
+  role: string
+): Promise<Document | null> {
+  if (role === "household") {
+    return queryOne<Document>(
+      "SELECT * FROM documents WHERE id = $1 AND access_level = 'household' AND deleted_at IS NULL",
+      [documentId]
+    );
+  }
+  return queryOne<Document>(
+    "SELECT * FROM documents WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
+    [documentId, userId]
+  );
+}
+
+export async function softDeleteDocument(
+  documentId: string,
+  userId: string
+): Promise<boolean> {
+  const count = await execute(
+    "UPDATE documents SET deleted_at = NOW() WHERE id = $1 AND user_id = $2 AND deleted_at IS NULL",
+    [documentId, userId]
+  );
+  return count > 0;
+}
+
 // --- Budget operations ---
 
 export async function getBudgetProgress(year: number, month: number) {

@@ -28,7 +28,8 @@ You have tools that access financial data. Use them when relevant:
 - Income Tracking: YTD income by source, projections
 - Tax Planning: deadlines, estimated payments, withholdings
 - Cash Flow: recurring bills, monthly surplus, projections
-- Financial Reporting: alerts, summaries, snapshots`;
+- Financial Reporting: alerts, summaries, snapshots
+- Document Management: upload receipts/tax docs, retrieve stored documents, generate downloadable reports`;
 
   if (role === "owner") {
     return (
@@ -50,7 +51,15 @@ You have tools that access financial data. Use them when relevant:
 - April 15 deadline: Q1 estimated taxes + CA LLC fee ($800) due.
 - No estimated tax payments made on AiTheia Q1 income. Recommend $10-12K federal + $3-4K CA.
 - W-4 filed as Single — review for MFJ accuracy with CPA.
-- No 403(b) contributions — potential $23,500/year tax-deferred savings.`
+- No 403(b) contributions — potential $23,500/year tax-deferred savings.
+
+## Document Capabilities
+- Users can attach files (receipts, tax docs) via the paperclip icon in chat
+- Use list_documents to find their uploaded documents
+- Use get_document_download_link to provide download links for specific documents
+- Use generate_report to create CSV reports (expense_summary, income_report, budget_analysis, tax_summary)
+- When a user uploads a document, acknowledge it and offer to categorize or discuss it
+- When providing download links, format them as clickable markdown: [Download filename](url)`
     );
   }
 
@@ -66,6 +75,11 @@ You are speaking with a household member. You can discuss:
 - Recurring bills and due dates
 - General financial questions
 
-You cannot access or discuss: tax strategy, income details, investment data, CPA communications, or business finances. If asked about these topics, politely explain that this information is restricted to the account owner.`
+You cannot access or discuss: tax strategy, income details, investment data, CPA communications, or business finances. If asked about these topics, politely explain that this information is restricted to the account owner.
+
+## Document Access
+- You can list documents shared with the household using list_documents
+- You can provide download links for accessible documents
+- You cannot access tax documents or generate financial reports — those are owner-only`
   );
 }

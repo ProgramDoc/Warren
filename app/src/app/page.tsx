@@ -7,10 +7,17 @@ import LeftSidebar from "@/components/layout/LeftSidebar";
 import ChatMessage from "@/components/chat/ChatMessage";
 import ChatInput from "@/components/chat/ChatInput";
 
+interface MessageAttachment {
+  id: string;
+  filename: string;
+  size: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  attachments?: MessageAttachment[];
 }
 
 interface Conversation {
@@ -175,10 +182,51 @@ export default function ChatPage() {
     );
   }
 
-  async function sendMessage(content: string) {
+  async function sendMessage(content: string, files?: File[]) {
     if (isStreaming) return;
 
-    const userMsg: Message = { id: "temp-" + Date.now(), role: "user", content };
+    // Upload files first if attached
+    const uploadedDocs: MessageAttachment[] = [];
+    if (files && files.length > 0) {
+      for (const file of files) {
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("category", "other");
+          if (activeConversationId) {
+            formData.append("conversationId", activeConversationId);
+          }
+          const uploadRes = await fetch("/api/documents", {
+            method: "POST",
+            body: formData,
+          });
+          if (uploadRes.ok) {
+            const data = await uploadRes.json();
+            uploadedDocs.push({
+              id: data.document.id,
+              filename: data.document.original_filename,
+              size: `${(data.document.size_bytes / 1024).toFixed(0)}KB`,
+            });
+          }
+        } catch (e) {
+          console.error("File upload failed:", e);
+        }
+      }
+    }
+
+    // Augment message with file context for Warren
+    let messageToSend = content;
+    if (uploadedDocs.length > 0) {
+      const fileList = uploadedDocs.map((d) => `${d.filename} (id: ${d.id})`).join(", ");
+      messageToSend = `${content}\n\n[Attached files: ${fileList}]`;
+    }
+
+    const userMsg: Message = {
+      id: "temp-" + Date.now(),
+      role: "user",
+      content,
+      attachments: uploadedDocs.length > 0 ? uploadedDocs : undefined,
+    };
     setMessages((prev) => [...prev, userMsg]);
     setIsStreaming(true);
     setStreamingContent("");
@@ -190,7 +238,7 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId: activeConversationId,
-          message: content,
+          message: messageToSend,
         }),
       });
 
@@ -363,7 +411,7 @@ export default function ChatPage() {
               )}
 
               {messages.map((msg) => (
-                <ChatMessage key={msg.id} role={msg.role} content={msg.content} />
+                <ChatMessage key={msg.id} role={msg.role} content={msg.content} attachments={msg.attachments} />
               ))}
 
               {isStreaming && streamingContent && (

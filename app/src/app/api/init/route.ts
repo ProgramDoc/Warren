@@ -32,6 +32,25 @@ export async function POST(req: NextRequest) {
       `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL`,
       `CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_conversations_project ON conversations(project_id)`,
+      // Phase 2.5: Document storage
+      `CREATE TABLE IF NOT EXISTS documents (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        filename TEXT NOT NULL,
+        original_filename TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        r2_key TEXT NOT NULL,
+        category TEXT NOT NULL CHECK(category IN ('receipt', 'tax', 'report', 'statement', 'other')),
+        access_level TEXT NOT NULL DEFAULT 'owner' CHECK(access_level IN ('owner', 'household')),
+        conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+        description TEXT,
+        deleted_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_documents_category ON documents(category)`,
+      `CREATE INDEX IF NOT EXISTS idx_documents_conversation ON documents(conversation_id)`,
     ];
     for (const sql of migrations) {
       try { await query(sql); } catch (e) { console.log("Migration skipped:", e); }

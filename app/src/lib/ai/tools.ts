@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { randomUUID } from "crypto";
 import {
   getBudgetProgress,
   getIncomeYTD,
@@ -8,7 +9,11 @@ import {
   getActiveAlerts,
   getExpensesByMonth,
   createExpense,
+  getDocuments,
+  getDocument,
+  createDocument,
 } from "@/lib/db";
+import { uploadToR2, getDownloadUrl } from "@/lib/storage/r2";
 
 // Tool definitions for Claude
 export const warrenTools: Anthropic.Tool[] = [
@@ -123,6 +128,52 @@ export const warrenTools: Anthropic.Tool[] = [
       required: ["date", "description", "amount", "category", "personal_or_business"],
     },
   },
+  {
+    name: "list_documents",
+    description:
+      "List uploaded documents (receipts, tax docs, reports, statements). Can filter by category.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        category: {
+          type: "string",
+          enum: ["receipt", "tax", "report", "statement", "other"],
+          description: "Filter by document category",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_document_download_link",
+    description:
+      "Get a temporary download link for a specific document by its ID.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        document_id: { type: "string", description: "UUID of the document" },
+      },
+      required: ["document_id"],
+    },
+  },
+  {
+    name: "generate_report",
+    description:
+      "Generate a financial report as a downloadable CSV file. The report is saved to document storage and a download link is returned. Owner only.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        report_type: {
+          type: "string",
+          enum: ["expense_summary", "income_report", "budget_analysis", "tax_summary"],
+          description: "Type of report to generate",
+        },
+        year: { type: "number", description: "Year for the report (defaults to current year)" },
+        month: { type: "number", description: "Month 1-12 (optional, for monthly reports)" },
+      },
+      required: ["report_type"],
+    },
+  },
 ];
 
 // Tools restricted to owner role
@@ -130,6 +181,7 @@ const OWNER_ONLY_TOOLS = new Set([
   "get_income_summary",
   "get_tax_deadlines",
   "get_tax_position",
+  "generate_report",
 ]);
 
 // Filter tools based on user role
@@ -256,6 +308,108 @@ export async function executeTool(
           userId
         );
         return JSON.stringify({ success: true, expense });
+      }
+
+      case "list_documents": {
+        const category = input.category as string | undefined;
+        const docs = await getDocuments(userId, role, { category });
+        return JSON.stringify({
+          documents: docs.map((d) => ({
+            id: d.id,
+            filename: d.original_filename,
+            category: d.category,
+            size: `${(d.size_bytes / 1024).toFixed(1)}KB`,
+            uploaded: d.created_at,
+            description: d.description,
+          })),
+        });
+      }
+
+      case "get_document_download_link": {
+        const docId = input.document_id as string;
+        const doc = await getDocument(docId, userId, role);
+        if (!doc) {
+          return JSON.stringify({ error: "Document not found or access denied" });
+        }
+        const url = await getDownloadUrl(doc.r2_key);
+        return JSON.stringify({
+          url,
+          filename: doc.original_filename,
+          mime_type: doc.mime_type,
+        });
+      }
+
+      case "generate_report": {
+        const year = (input.year as number) || currentYear;
+        const month = input.month as number | undefined;
+        const reportType = input.report_type as string;
+
+        let csvContent = "";
+        let filename = "";
+
+        switch (reportType) {
+          case "expense_summary": {
+            const m = month || currentMonth;
+            const data = await getExpensesByMonth(year, m);
+            csvContent = "Category,Total\n" + (data as Array<{ category: string; total: string }>)
+              .map((d) => `"${d.category}","${d.total}"`)
+              .join("\n");
+            filename = `expense-summary-${year}-${String(m).padStart(2, "0")}.csv`;
+            break;
+          }
+          case "income_report": {
+            const entries = await getIncomeByPeriod(year);
+            csvContent = "Period,Source,Gross,Net,Tax Withheld\n" + entries
+              .map((e) => `"${e.period}","${e.source}","${e.gross_amount}","${e.net_amount || ""}","${e.tax_withheld || ""}"`)
+              .join("\n");
+            filename = `income-report-${year}.csv`;
+            break;
+          }
+          case "budget_analysis": {
+            const m = month || currentMonth;
+            const data = await getBudgetProgress(year, m);
+            csvContent = "Code,Category,Budget,Spent,Remaining\n" + (data as Array<{ code: string; name: string; monthly_budget: string; spent: string }>)
+              .map((d) => {
+                const remaining = parseFloat(d.monthly_budget) - parseFloat(d.spent);
+                return `"${d.code}","${d.name}","${d.monthly_budget}","${d.spent}","${remaining.toFixed(2)}"`;
+              })
+              .join("\n");
+            filename = `budget-analysis-${year}-${String(m).padStart(2, "0")}.csv`;
+            break;
+          }
+          case "tax_summary": {
+            const deadlines = await getTaxDeadlines();
+            const ytd = await getIncomeYTD(year);
+            csvContent = "Item,Value\n";
+            csvContent += `"YTD Gross Income","${ytd?.total_gross || 0}"\n`;
+            csvContent += `"YTD Tax Withheld","${ytd?.total_tax || 0}"\n`;
+            csvContent += `"YTD Net Income","${ytd?.total_net || 0}"\n\n`;
+            csvContent += "Deadline,Description,Type,Amount,Status\n";
+            csvContent += (deadlines as Array<{ deadline: string; description: string; tax_type: string; amount: string; status: string }>)
+              .map((d) => `"${d.deadline}","${d.description}","${d.tax_type}","${d.amount || ""}","${d.status}"`)
+              .join("\n");
+            filename = `tax-summary-${year}.csv`;
+            break;
+          }
+          default:
+            return JSON.stringify({ error: `Unknown report type: ${reportType}` });
+        }
+
+        const docId = randomUUID();
+        const buffer = Buffer.from(csvContent, "utf-8");
+        const r2Key = await uploadToR2(userId, docId, filename, buffer, "text/csv");
+        const doc = await createDocument(
+          userId, filename, filename, "text/csv", buffer.length, r2Key, "report", "owner"
+        );
+        const url = await getDownloadUrl(r2Key);
+
+        return JSON.stringify({
+          success: true,
+          document_id: doc.id,
+          download_url: url,
+          filename,
+          note: "This link expires in 1 hour. Use get_document_download_link to get a new one.",
+        });
       }
 
       default:

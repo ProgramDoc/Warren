@@ -128,6 +128,22 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  filename TEXT NOT NULL,
+  original_filename TEXT NOT NULL,
+  mime_type TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL,
+  r2_key TEXT NOT NULL,
+  category TEXT NOT NULL CHECK(category IN ('receipt', 'tax', 'report', 'statement', 'other')),
+  access_level TEXT NOT NULL DEFAULT 'owner' CHECK(access_level IN ('owner', 'household')),
+  conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+  description TEXT,
+  deleted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
@@ -142,3 +158,6 @@ CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
 CREATE INDEX IF NOT EXISTS idx_income_period ON income_entries(period);
 CREATE INDEX IF NOT EXISTS idx_income_source ON income_entries(source);
+CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_documents_category ON documents(category);
+CREATE INDEX IF NOT EXISTS idx_documents_conversation ON documents(conversation_id);
