@@ -6,7 +6,7 @@
 
 **Principal**: Tom — Director of Applied AI at UCLA, Co-Director of INOVAi Center, Founder of AiTheia LLC.
 
-**Tech stack**: Obsidian vault (markdown + YAML frontmatter) + Claude Code skills (SKILL.md) + git for version control + MCP integrations (Excel, Plaid, TurboTax).
+**Tech stack**: Obsidian vault (markdown + YAML frontmatter) + Claude Code skills (SKILL.md) + git for version control + MCP integrations (Excel, Plaid, TurboTax) + Next.js 16 web app (deployed on Render.com) with Claude Opus AI chat interface.
 
 ## Architecture
 
@@ -182,21 +182,54 @@ Skills progress: **Nascent** → **Functional** → **Refined** → **Polished**
 | Alfred's Finance Agent | `Alfred/00-Alfred/Sub-Agents/Finance-Agent.md` | Redirects to Warren |
 | GitHub Repo | `https://github.com/ProgramDoc/Warren.git` | Version control (skills + charters only) |
 
-## Web App (Phase 1)
+## Web App — Live on Render.com
 
-**Location:** `Warren/app/` — Next.js 16 + TypeScript + Tailwind
-**Hosting:** Render.com (Web Service + PostgreSQL)
+**URL:** `https://warren-dashboard.onrender.com`
+**Location:** `Warren/app/` — Next.js 16.2.3 + TypeScript + Tailwind CSS v4
+**Hosting:** Render.com (Web Service `warren-dashboard` + PostgreSQL `warren-db`, free tier)
+**Status:** Deployed and operational. Phase 1 complete, Phase 2-4 planned.
 
 **Architecture:**
 ```
 Browser/Phone → Render (HTTPS) → Next.js API → PostgreSQL
                                               → AES-256-GCM encrypted fields
-Warren (Claude) → Vault (local markdown) ← manually synced → Cloud DB
+                                → Claude Opus API (streaming via SSE)
+                                → 9 financial tools (mapped to 6 agents)
 ```
 
-**Auth:** Email + password (bcrypt 12 rounds), JWT sessions, rate-limited login
-**RBAC:** Owner (Tom) = full access | Household (wife) = shared budgets only
-**Encryption:** AES-256-GCM for sensitive database fields
+**AI Chat Interface:**
+- Claude Opus (`claude-opus-4-20250514`) powers an interactive financial advisor chat
+- SSE streaming for real-time responses (Render free tier doesn't support WebSockets)
+- 9 Claude tool-use definitions route queries to Warren's 6 agents: `get_budget_progress`, `get_income_summary`, `get_expense_breakdown`, `get_tax_deadlines`, `get_tax_position`, `get_cashflow_projection`, `get_recurring_bills`, `get_alerts`, `log_expense`
+- Role-aware system prompt: owner gets full financial context, household gets budget-only view
+- Conversation persistence with rename, delete, and share between users
+
+**Design System:** "The Sovereign Intelligence" — deep navy palette (#10131a base), Manrope/Inter typography, glassmorphism, gradient accents, no-border tonal layering
+
+**Auth:** Email + password (bcrypt 12 rounds), JWT sessions, TOTP 2FA support (Duo/Microsoft Authenticator compatible)
+**Accounts:** Tom (tck936@mail.harvard.edu, owner) and Sabrina (sabrina.liu4@gmail.com, household)
+**RBAC:** Owner (Tom) = full access | Household (Sabrina) = shared budgets only
+**Encryption:** AES-256-GCM for TOTP secrets and sensitive database fields
+
+**Three-Pane Layout:**
+- Left sidebar: conversation list with create/rename/delete/share, Warren AI badge
+- Center: streaming chat with Claude Opus, tool status indicators, quick prompts
+- Right pane: reserved for Phase 3 (output tabs — charts, tables, reports)
+
+**Database Tables:** users, sessions, audit_log, income_entries, expenses, recurring_bills, tax_deadlines, budget_categories, alerts, conversations (with shared_with), messages
+
+**Key Files:**
+| File | Purpose |
+|------|---------|
+| `app/src/lib/ai/system-prompt.ts` | Role-aware system prompt builder |
+| `app/src/lib/ai/tools.ts` | 9 Claude tool definitions + executors |
+| `app/src/app/api/chat/route.ts` | SSE streaming chat endpoint |
+| `app/src/app/api/conversations/route.ts` | Conversation CRUD (GET, PATCH, DELETE) |
+| `app/src/app/api/init/route.ts` | DB init + migrations + user creation + seeding |
+| `app/src/components/layout/LeftSidebar.tsx` | Sidebar with context menu (rename/share/delete) |
+| `app/src/components/chat/ChatMessage.tsx` | Message bubbles (user + assistant) |
+| `app/src/components/chat/ChatInput.tsx` | Pill-shaped input with gradient send button |
+| `app/src/app/globals.css` | Full design system CSS variables |
 
 **Development Commands:**
 ```bash
@@ -205,15 +238,15 @@ npm run dev        # Start dev server (localhost:3000)
 npm run build      # Production build
 ```
 
-**Deploy to Render:**
-1. Push `app/` directory to GitHub
-2. Connect repo on Render Dashboard → New Web Service
-3. Render auto-detects `render.yaml` blueprint
-4. After deploy: `curl -X POST https://your-app.onrender.com/api/init -H "Authorization: Bearer $INIT_SECRET"`
-5. Then run seed.sql against the PostgreSQL database
-6. Visit the app → Setup page creates owner account
+**Deploy:** Push to GitHub → Render auto-deploys from `render.yaml` blueprint (rootDir: app)
+**Init/Migrate:** `curl -X POST https://warren-dashboard.onrender.com/api/init -H "Authorization: Bearer $INIT_SECRET"` — creates tables, runs migrations, seeds data, creates user accounts from env vars
 
-**Environment:** `Warren/app/.env.local` (gitignored) — needs DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY
+**Environment:** Render env vars on `warren-dashboard` service: DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY, INIT_SECRET, OWNER_EMAIL, OWNER_PASSWORD, HOUSEHOLD_EMAIL, HOUSEHOLD_PASSWORD, ANTHROPIC_API_KEY. Local dev: `Warren/app/.env.local` (gitignored)
+
+**Remaining Phases:**
+- Phase 2: Projects/folders for organizing conversations
+- Phase 3: Right pane with output tabs (budget charts, tax position, data tables generated from chat)
+- Phase 4: Audio input (Web Speech API), panel resizing, markdown rendering in messages
 
 ## Known Gotchas
 
@@ -223,5 +256,6 @@ npm run build      # Production build
 | **Budget amounts are TBD** | Monthly budget targets in the Chart of Accounts are placeholder until Tom sets them. |
 | **AiTheia S-Corp not elected** | LLC vs S-Corp election affects tax calculations significantly. Discuss with CPA. |
 | **Plaid not yet connected** | Bank transaction sync requires a Plaid developer account. See `09-Reference/Integrations.md`. |
-| **App not yet deployed** | Render.com deployment pending. See `app/render.yaml` for blueprint. |
+| **2FA not yet configured** | TOTP support is built in but neither account has enabled it yet. |
 | **No estimated tax payments** | AiTheia Q1 income $62K with $0 estimated taxes. April 15 deadline imminent. |
+| **No co-authored-by in commits** | Tom explicitly requested no Claude attribution in git commits or code. |

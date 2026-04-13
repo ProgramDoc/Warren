@@ -17,6 +17,26 @@ export async function POST(req: NextRequest) {
   try {
     await initDb();
 
+    // Run migrations for columns added after initial schema
+    const migrations = [
+      `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS shared_with UUID REFERENCES users(id) ON DELETE SET NULL`,
+      // Phase 2: Projects for organizing conversations
+      `CREATE TABLE IF NOT EXISTS projects (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        position INTEGER NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )`,
+      `ALTER TABLE conversations ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_conversations_project ON conversations(project_id)`,
+    ];
+    for (const sql of migrations) {
+      try { await query(sql); } catch (e) { console.log("Migration skipped:", e); }
+    }
+
     const usersCreated: string[] = [];
 
     // Create owner account from env vars

@@ -241,10 +241,21 @@ export async function getActiveAlerts() {
 
 // --- Conversation operations ---
 
+export interface Project {
+  id: string;
+  user_id: string;
+  name: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Conversation {
   id: string;
   user_id: string;
   title: string;
+  shared_with: string | null;
+  project_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -275,7 +286,9 @@ export async function getConversations(
   limit = 50
 ): Promise<Conversation[]> {
   return query<Conversation>(
-    "SELECT * FROM conversations WHERE user_id = $1 ORDER BY updated_at DESC LIMIT $2",
+    `SELECT * FROM conversations
+     WHERE user_id = $1 OR shared_with = $1
+     ORDER BY updated_at DESC LIMIT $2`,
     [userId, limit]
   );
 }
@@ -285,7 +298,7 @@ export async function getConversation(
   userId: string
 ): Promise<Conversation | null> {
   return queryOne<Conversation>(
-    "SELECT * FROM conversations WHERE id = $1 AND user_id = $2",
+    "SELECT * FROM conversations WHERE id = $1 AND (user_id = $2 OR shared_with = $2)",
     [id, userId]
   );
 }
@@ -309,8 +322,25 @@ export async function deleteConversation(
   userId: string
 ): Promise<void> {
   await execute(
-    "DELETE FROM conversations WHERE id = $1 AND user_id = $2",
+    "DELETE FROM conversations WHERE id = $1 AND (user_id = $2 OR shared_with = $2)",
     [id, userId]
+  );
+}
+
+export async function shareConversation(
+  id: string,
+  ownerId: string,
+  shareWithUserId: string | null
+): Promise<void> {
+  await execute(
+    "UPDATE conversations SET shared_with = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3",
+    [shareWithUserId, id, ownerId]
+  );
+}
+
+export async function getAllUsers(): Promise<{ id: string; display_name: string; email: string }[]> {
+  return query<{ id: string; display_name: string; email: string }>(
+    "SELECT id, display_name, email FROM users ORDER BY display_name"
   );
 }
 
@@ -344,6 +374,65 @@ export async function getMessages(
     [conversationId, limit]
   );
 }
+
+// --- Project operations ---
+
+export async function createProject(
+  userId: string,
+  name: string
+): Promise<Project> {
+  const maxPos = await queryOne<{ max: string }>(
+    "SELECT COALESCE(MAX(position), -1) as max FROM projects WHERE user_id = $1",
+    [userId]
+  );
+  const position = parseInt(maxPos?.max || "-1", 10) + 1;
+  const result = await queryOne<Project>(
+    "INSERT INTO projects (user_id, name, position) VALUES ($1, $2, $3) RETURNING *",
+    [userId, name, position]
+  );
+  return result!;
+}
+
+export async function getProjects(userId: string): Promise<Project[]> {
+  return query<Project>(
+    "SELECT * FROM projects WHERE user_id = $1 ORDER BY position ASC, created_at ASC",
+    [userId]
+  );
+}
+
+export async function updateProjectName(
+  id: string,
+  userId: string,
+  name: string
+): Promise<void> {
+  await execute(
+    "UPDATE projects SET name = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3",
+    [name, id, userId]
+  );
+}
+
+export async function deleteProject(
+  id: string,
+  userId: string
+): Promise<void> {
+  await execute(
+    "DELETE FROM projects WHERE id = $1 AND user_id = $2",
+    [id, userId]
+  );
+}
+
+export async function moveConversationToProject(
+  conversationId: string,
+  userId: string,
+  projectId: string | null
+): Promise<void> {
+  await execute(
+    "UPDATE conversations SET project_id = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3",
+    [projectId, conversationId, userId]
+  );
+}
+
+// --- Budget operations ---
 
 export async function getBudgetProgress(year: number, month: number) {
   return query(

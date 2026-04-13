@@ -17,6 +17,15 @@ interface Conversation {
   id: string;
   title: string;
   updated_at: string;
+  user_id: string;
+  shared_with: string | null;
+  project_id: string | null;
+}
+
+interface Project {
+  id: string;
+  name: string;
+  position: number;
 }
 
 const QUICK_PROMPTS = [
@@ -29,10 +38,12 @@ const QUICK_PROMPTS = [
 export default function ChatPage() {
   const router = useRouter();
   const [user, setUser] = useState<{
+    id: string;
     displayName: string;
     role: string;
   } | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
@@ -48,7 +59,7 @@ export default function ChatPage() {
           router.push(data.needsSetup ? "/setup" : "/login");
           return;
         }
-        setUser(data.user);
+        setUser({ id: data.user.id, displayName: data.user.displayName, role: data.user.role });
       });
   }, [router]);
 
@@ -60,9 +71,20 @@ export default function ChatPage() {
     }
   }, []);
 
+  const loadProjects = useCallback(async () => {
+    const res = await fetch("/api/projects");
+    if (res.ok) {
+      const data = await res.json();
+      setProjects(data.projects);
+    }
+  }, []);
+
   useEffect(() => {
-    if (user) loadConversations();
-  }, [user, loadConversations]);
+    if (user) {
+      loadConversations();
+      loadProjects();
+    }
+  }, [user, loadConversations, loadProjects]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -87,6 +109,70 @@ export default function ChatPage() {
     await fetch(`/api/conversations?id=${id}`, { method: "DELETE" });
     if (activeConversationId === id) startNewChat();
     loadConversations();
+  }
+
+  async function handleRenameConversation(id: string, title: string) {
+    await fetch("/api/conversations", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, title }),
+    });
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, title } : c))
+    );
+  }
+
+  async function handleShareConversation(id: string, shareWithUserId: string | null) {
+    await fetch("/api/conversations", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, shareWith: shareWithUserId }),
+    });
+    setConversations((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, shared_with: shareWithUserId } : c))
+    );
+  }
+
+  async function handleCreateProject(name: string) {
+    const res = await fetch("/api/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setProjects((prev) => [...prev, data.project]);
+    }
+  }
+
+  async function handleRenameProject(id: string, name: string) {
+    await fetch("/api/projects", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, name }),
+    });
+    setProjects((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, name } : p))
+    );
+  }
+
+  async function handleDeleteProject(id: string) {
+    await fetch(`/api/projects?id=${id}`, { method: "DELETE" });
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+    setConversations((prev) =>
+      prev.map((c) => (c.project_id === id ? { ...c, project_id: null } : c))
+    );
+  }
+
+  async function handleMoveConversation(conversationId: string, projectId: string | null) {
+    await fetch("/api/conversations", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: conversationId, projectId }),
+    });
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, project_id: projectId } : c))
+    );
   }
 
   async function sendMessage(content: string) {
@@ -203,10 +289,18 @@ export default function ChatPage() {
       <div className="flex flex-1 overflow-hidden">
         <LeftSidebar
           conversations={conversations}
+          projects={projects}
           activeId={activeConversationId}
+          currentUserId={user.id}
           onSelect={selectConversation}
           onDelete={handleDeleteConversation}
+          onRename={handleRenameConversation}
+          onShare={handleShareConversation}
           onNewChat={startNewChat}
+          onCreateProject={handleCreateProject}
+          onRenameProject={handleRenameProject}
+          onDeleteProject={handleDeleteProject}
+          onMoveConversation={handleMoveConversation}
         />
 
         {/* Center Chat Pane */}
