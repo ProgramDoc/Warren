@@ -1,7 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import PlaidLinkButton from "@/components/PlaidLinkButton";
+
+interface PlaidItemInfo {
+  id: number;
+  institution_name: string | null;
+  products: string[];
+  status: string;
+  error_code: string | null;
+  updated_at: string;
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -14,6 +24,42 @@ export default function SettingsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [user, setUser] = useState<{ email: string; displayName: string; role: string } | null>(null);
+  const [plaidItems, setPlaidItems] = useState<PlaidItemInfo[]>([]);
+  const [syncing, setSyncing] = useState<number | null>(null);
+  const [includeInvestments, setIncludeInvestments] = useState(false);
+
+  const loadPlaidItems = useCallback(async () => {
+    try {
+      const res = await fetch("/api/plaid/items");
+      if (res.ok) {
+        const data = await res.json();
+        setPlaidItems(data.items || []);
+      }
+    } catch {}
+  }, []);
+
+  async function handleSync(itemId: number) {
+    setSyncing(itemId);
+    try {
+      await fetch("/api/plaid/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item_id: itemId }),
+      });
+      await loadPlaidItems();
+    } catch {}
+    setSyncing(null);
+  }
+
+  async function handleDisconnect(itemId: number) {
+    if (!confirm("Disconnect this account? Synced transactions will remain.")) return;
+    await fetch("/api/plaid/disconnect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ item_id: itemId }),
+    });
+    await loadPlaidItems();
+  }
 
   useEffect(() => {
     // Check auth and get user info
@@ -25,8 +71,9 @@ export default function SettingsPage() {
           return;
         }
         setUser(data.user);
+        if (data.user?.role === "owner") loadPlaidItems();
       });
-  }, [router]);
+  }, [router, loadPlaidItems]);
 
   async function handleStartSetup() {
     setError("");
@@ -242,6 +289,101 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+
+        {/* Connected Accounts (Owner Only) */}
+        {user?.role === "owner" && (
+          <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold">Connected Accounts</h2>
+              <p className="text-sm text-gray-400 mt-1">
+                Link your bank accounts, credit cards, and investment accounts for automatic transaction sync.
+              </p>
+            </div>
+
+            {/* Connected institutions */}
+            {plaidItems.length > 0 && (
+              <div className="space-y-3 mb-5">
+                {plaidItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between p-4 rounded-lg"
+                    style={{ background: "var(--surface-container)" }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center"
+                        style={{ background: "var(--surface-container-high)" }}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: "var(--primary)" }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: "var(--on-surface)" }}>
+                          {item.institution_name || "Connected Account"}
+                        </p>
+                        <p className="text-[10px]" style={{ color: "var(--on-surface-muted)" }}>
+                          {item.products.join(", ")} · Last synced{" "}
+                          {new Date(item.updated_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="text-[10px] px-2 py-0.5 rounded-full"
+                        style={{
+                          background: item.status === "active" ? "rgba(122, 232, 160, 0.15)" : "rgba(255, 123, 123, 0.15)",
+                          color: item.status === "active" ? "var(--accent-green)" : "var(--accent-red)",
+                        }}
+                      >
+                        {item.status}
+                      </span>
+                      <button
+                        onClick={() => handleSync(item.id)}
+                        disabled={syncing === item.id}
+                        className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                        style={{ background: "var(--surface-container-high)", color: "var(--primary)" }}
+                      >
+                        {syncing === item.id ? "Syncing..." : "Sync"}
+                      </button>
+                      <button
+                        onClick={() => handleDisconnect(item.id)}
+                        className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                        style={{ color: "var(--accent-red)" }}
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {plaidItems.length === 0 && (
+              <p className="text-sm mb-5" style={{ color: "var(--on-surface-muted)" }}>
+                No accounts connected yet. Click below to get started.
+              </p>
+            )}
+
+            {/* Include investments toggle */}
+            <label className="flex items-center gap-2 mb-4 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={includeInvestments}
+                onChange={(e) => setIncludeInvestments(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-xs" style={{ color: "var(--on-surface-variant)" }}>
+                Include investment accounts (Schwab, Fidelity, Vanguard, etc.)
+              </span>
+            </label>
+
+            <PlaidLinkButton
+              products={includeInvestments ? ["transactions", "investments"] : ["transactions"]}
+              onSuccess={loadPlaidItems}
+            />
+          </section>
+        )}
 
         {/* Account info */}
         <section className="bg-gray-900 rounded-xl border border-gray-800 p-6">

@@ -12,8 +12,13 @@ import {
   getDocuments,
   getDocument,
   createDocument,
+  getPlaidItems,
+  getAccountBalances,
+  getAccountBalancesByType,
+  getInvestmentHoldings,
 } from "@/lib/db";
 import { uploadToR2, getDownloadUrl } from "@/lib/storage/r2";
+import { syncTransactions, syncBalances, syncInvestments } from "@/lib/plaid/sync";
 
 // Tool definitions for Claude
 export const warrenTools: Anthropic.Tool[] = [
@@ -157,6 +162,44 @@ export const warrenTools: Anthropic.Tool[] = [
     },
   },
   {
+    name: "sync_bank_transactions",
+    description:
+      "Sync latest transactions from connected bank accounts via Plaid. Imports new transactions, updates modified ones, and removes deleted ones. Owner only.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        item_id: { type: "number", description: "Specific Plaid item ID to sync. Omit to sync all." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_account_balances",
+    description:
+      "Get current balances for all connected bank accounts, credit cards, and investment accounts.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        type: {
+          type: "string",
+          enum: ["depository", "credit", "investment", "loan"],
+          description: "Filter by account type. Omit for all accounts.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_investment_holdings",
+    description:
+      "Get current investment holdings across all connected brokerage accounts. Shows ticker, shares, price, and total value. Owner only.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
     name: "generate_report",
     description:
       "Generate a financial report as a downloadable CSV file. The report is saved to document storage and a download link is returned. Owner only.",
@@ -182,6 +225,8 @@ const OWNER_ONLY_TOOLS = new Set([
   "get_tax_deadlines",
   "get_tax_position",
   "generate_report",
+  "sync_bank_transactions",
+  "get_investment_holdings",
 ]);
 
 // Filter tools based on user role
@@ -308,6 +353,75 @@ export async function executeTool(
           userId
         );
         return JSON.stringify({ success: true, expense });
+      }
+
+      case "sync_bank_transactions": {
+        const items = input.item_id
+          ? [{ id: input.item_id as number }]
+          : await getPlaidItems();
+
+        if (items.length === 0) {
+          return JSON.stringify({ error: "No bank accounts connected. Go to Settings to connect." });
+        }
+
+        const results = [];
+        for (const item of items) {
+          try {
+            const txnResult = await syncTransactions(item.id);
+            await syncBalances(item.id);
+            results.push({ item_id: item.id, ...txnResult, status: "success" });
+          } catch (e) {
+            results.push({ item_id: item.id, status: "error", error: e instanceof Error ? e.message : String(e) });
+          }
+        }
+        return JSON.stringify({ results });
+      }
+
+      case "get_account_balances": {
+        const type = input.type as string | undefined;
+        const accounts = type
+          ? await getAccountBalancesByType(type)
+          : await getAccountBalances();
+
+        if (accounts.length === 0) {
+          return JSON.stringify({ message: "No accounts connected. Go to Settings to connect bank accounts." });
+        }
+
+        return JSON.stringify({
+          accounts: accounts.map((a) => ({
+            institution: a.institution_name,
+            name: a.name,
+            type: a.type,
+            subtype: a.subtype,
+            mask: a.mask,
+            current_balance: a.current_balance,
+            available_balance: a.available_balance,
+            last_synced: a.last_synced_at,
+          })),
+        });
+      }
+
+      case "get_investment_holdings": {
+        const holdings = await getInvestmentHoldings();
+
+        if (holdings.length === 0) {
+          return JSON.stringify({ message: "No investment accounts connected. Go to Settings to connect." });
+        }
+
+        const totalValue = holdings.reduce((sum, h) => sum + (parseFloat(String(h.value)) || 0), 0);
+        return JSON.stringify({
+          total_value: totalValue,
+          holdings: holdings.map((h) => ({
+            institution: h.institution_name,
+            ticker: h.ticker,
+            name: h.name,
+            quantity: h.quantity,
+            price: h.price,
+            value: h.value,
+            cost_basis: h.cost_basis,
+            type: h.type,
+          })),
+        });
       }
 
       case "list_documents": {

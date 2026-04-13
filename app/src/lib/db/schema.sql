@@ -144,6 +144,55 @@ CREATE TABLE IF NOT EXISTS documents (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Plaid integration tables
+
+CREATE TABLE IF NOT EXISTS plaid_items (
+  id SERIAL PRIMARY KEY,
+  item_id TEXT UNIQUE NOT NULL,
+  access_token TEXT NOT NULL,
+  institution_id TEXT,
+  institution_name TEXT,
+  products TEXT[] NOT NULL DEFAULT '{}',
+  cursor TEXT,
+  status TEXT DEFAULT 'active' CHECK(status IN ('active', 'error', 'disconnected')),
+  error_code TEXT,
+  connected_by UUID NOT NULL REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS account_balances (
+  id SERIAL PRIMARY KEY,
+  plaid_item_id INTEGER NOT NULL REFERENCES plaid_items(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  official_name TEXT,
+  type TEXT NOT NULL,
+  subtype TEXT,
+  mask TEXT,
+  current_balance NUMERIC(14,2),
+  available_balance NUMERIC(14,2),
+  currency TEXT DEFAULT 'USD',
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS investment_holdings (
+  id SERIAL PRIMARY KEY,
+  plaid_item_id INTEGER NOT NULL REFERENCES plaid_items(id) ON DELETE CASCADE,
+  account_id TEXT NOT NULL,
+  security_id TEXT,
+  ticker TEXT,
+  name TEXT NOT NULL,
+  quantity NUMERIC(16,6),
+  price NUMERIC(14,4),
+  value NUMERIC(14,2),
+  cost_basis NUMERIC(14,2),
+  type TEXT,
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_user ON conversations(user_id);
@@ -161,3 +210,7 @@ CREATE INDEX IF NOT EXISTS idx_income_source ON income_entries(source);
 CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
 CREATE INDEX IF NOT EXISTS idx_documents_category ON documents(category);
 CREATE INDEX IF NOT EXISTS idx_documents_conversation ON documents(conversation_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_account_balances_account ON account_balances(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_balances_plaid_item ON account_balances(plaid_item_id);
+CREATE INDEX IF NOT EXISTS idx_investment_holdings_account ON investment_holdings(account_id);
+CREATE INDEX IF NOT EXISTS idx_investment_holdings_plaid_item ON investment_holdings(plaid_item_id);

@@ -539,6 +539,216 @@ export async function softDeleteDocument(
   return count > 0;
 }
 
+// --- Plaid operations ---
+
+export interface PlaidItem {
+  id: number;
+  item_id: string;
+  access_token: string;
+  institution_id: string | null;
+  institution_name: string | null;
+  products: string[];
+  cursor: string | null;
+  status: string;
+  error_code: string | null;
+  connected_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AccountBalance {
+  id: number;
+  plaid_item_id: number;
+  account_id: string;
+  name: string;
+  official_name: string | null;
+  type: string;
+  subtype: string | null;
+  mask: string | null;
+  current_balance: number | null;
+  available_balance: number | null;
+  currency: string;
+  last_synced_at: string | null;
+  institution_name?: string;
+}
+
+export interface InvestmentHolding {
+  id: number;
+  plaid_item_id: number;
+  account_id: string;
+  security_id: string | null;
+  ticker: string | null;
+  name: string;
+  quantity: number | null;
+  price: number | null;
+  value: number | null;
+  cost_basis: number | null;
+  type: string | null;
+  last_synced_at: string | null;
+  institution_name?: string;
+}
+
+export async function createPlaidItem(
+  itemId: string,
+  encryptedToken: string,
+  institutionId: string | null,
+  institutionName: string | null,
+  products: string[],
+  connectedBy: string
+): Promise<PlaidItem> {
+  const result = await queryOne<PlaidItem>(
+    `INSERT INTO plaid_items (item_id, access_token, institution_id, institution_name, products, connected_by)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+    [itemId, encryptedToken, institutionId, institutionName, products, connectedBy]
+  );
+  return result!;
+}
+
+export async function getPlaidItems(): Promise<PlaidItem[]> {
+  return query<PlaidItem>(
+    "SELECT * FROM plaid_items WHERE status != 'disconnected' ORDER BY created_at DESC"
+  );
+}
+
+export async function getPlaidItem(id: number): Promise<PlaidItem | null> {
+  return queryOne<PlaidItem>("SELECT * FROM plaid_items WHERE id = $1", [id]);
+}
+
+export async function updatePlaidItemCursor(id: number, cursor: string): Promise<void> {
+  await execute(
+    "UPDATE plaid_items SET cursor = $1, updated_at = NOW() WHERE id = $2",
+    [cursor, id]
+  );
+}
+
+export async function updatePlaidItemStatus(
+  id: number,
+  status: string,
+  errorCode?: string
+): Promise<void> {
+  await execute(
+    "UPDATE plaid_items SET status = $1, error_code = $2, updated_at = NOW() WHERE id = $3",
+    [status, errorCode || null, id]
+  );
+}
+
+export async function disconnectPlaidItem(id: number): Promise<void> {
+  await execute(
+    "UPDATE plaid_items SET status = 'disconnected', updated_at = NOW() WHERE id = $1",
+    [id]
+  );
+}
+
+export async function upsertAccountBalance(
+  plaidItemId: number,
+  accountId: string,
+  name: string,
+  officialName: string | null,
+  type: string,
+  subtype: string | null,
+  mask: string | null,
+  currentBalance: number | null,
+  availableBalance: number | null,
+  currency: string
+): Promise<void> {
+  await execute(
+    `INSERT INTO account_balances (plaid_item_id, account_id, name, official_name, type, subtype, mask, current_balance, available_balance, currency, last_synced_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+     ON CONFLICT (account_id) DO UPDATE SET
+       name = EXCLUDED.name, official_name = EXCLUDED.official_name,
+       current_balance = EXCLUDED.current_balance, available_balance = EXCLUDED.available_balance,
+       last_synced_at = NOW()`,
+    [plaidItemId, accountId, name, officialName, type, subtype, mask, currentBalance, availableBalance, currency]
+  );
+}
+
+export async function getAccountBalances(): Promise<AccountBalance[]> {
+  return query<AccountBalance>(
+    `SELECT ab.*, pi.institution_name FROM account_balances ab
+     JOIN plaid_items pi ON ab.plaid_item_id = pi.id
+     WHERE pi.status = 'active' ORDER BY ab.type, ab.name`
+  );
+}
+
+export async function getAccountBalancesByType(type: string): Promise<AccountBalance[]> {
+  return query<AccountBalance>(
+    `SELECT ab.*, pi.institution_name FROM account_balances ab
+     JOIN plaid_items pi ON ab.plaid_item_id = pi.id
+     WHERE pi.status = 'active' AND ab.type = $1 ORDER BY ab.name`,
+    [type]
+  );
+}
+
+export async function replaceInvestmentHoldings(
+  plaidItemId: number,
+  holdings: Array<{
+    accountId: string;
+    securityId: string | null;
+    ticker: string | null;
+    name: string;
+    quantity: number | null;
+    price: number | null;
+    value: number | null;
+    costBasis: number | null;
+    type: string | null;
+  }>
+): Promise<number> {
+  await execute("DELETE FROM investment_holdings WHERE plaid_item_id = $1", [plaidItemId]);
+  for (const h of holdings) {
+    await execute(
+      `INSERT INTO investment_holdings (plaid_item_id, account_id, security_id, ticker, name, quantity, price, value, cost_basis, type, last_synced_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+      [plaidItemId, h.accountId, h.securityId, h.ticker, h.name, h.quantity, h.price, h.value, h.costBasis, h.type]
+    );
+  }
+  return holdings.length;
+}
+
+export async function getInvestmentHoldings(): Promise<InvestmentHolding[]> {
+  return query<InvestmentHolding>(
+    `SELECT ih.*, pi.institution_name FROM investment_holdings ih
+     JOIN plaid_items pi ON ih.plaid_item_id = pi.id
+     WHERE pi.status = 'active' ORDER BY ih.value DESC NULLS LAST`
+  );
+}
+
+export async function createPlaidExpense(
+  date: string,
+  description: string,
+  amount: number,
+  category: string,
+  personalOrBusiness: string,
+  plaidTransactionId: string,
+  plaidItemId: number,
+  createdBy: string
+): Promise<void> {
+  await execute(
+    `INSERT INTO expenses (date, description, amount, category, personal_or_business, plaid_transaction_id, plaid_item_id, source, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'plaid', $8)
+     ON CONFLICT (plaid_transaction_id) WHERE plaid_transaction_id IS NOT NULL DO NOTHING`,
+    [date, description, amount, category, personalOrBusiness, plaidTransactionId, plaidItemId, createdBy]
+  );
+}
+
+export async function updatePlaidExpense(
+  plaidTransactionId: string,
+  date: string,
+  description: string,
+  amount: number,
+  category: string,
+  personalOrBusiness: string
+): Promise<void> {
+  await execute(
+    `UPDATE expenses SET date = $1, description = $2, amount = $3, category = $4, personal_or_business = $5
+     WHERE plaid_transaction_id = $6`,
+    [date, description, amount, category, personalOrBusiness, plaidTransactionId]
+  );
+}
+
+export async function removePlaidExpense(plaidTransactionId: string): Promise<void> {
+  await execute("DELETE FROM expenses WHERE plaid_transaction_id = $1", [plaidTransactionId]);
+}
+
 // --- Budget operations ---
 
 export async function getBudgetProgress(year: number, month: number) {

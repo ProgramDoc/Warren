@@ -29,7 +29,8 @@ You have tools that access financial data. Use them when relevant:
 - Tax Planning: deadlines, estimated payments, withholdings
 - Cash Flow: recurring bills, monthly surplus, projections
 - Financial Reporting: alerts, summaries, snapshots
-- Document Management: upload receipts/tax docs, retrieve stored documents, generate downloadable reports`;
+- Document Management: upload receipts/tax docs, retrieve stored documents, generate downloadable reports
+- Bank Integration: connected account balances, transaction sync from Plaid, investment holdings`;
 
   if (role === "owner") {
     return (
@@ -59,7 +60,15 @@ You have tools that access financial data. Use them when relevant:
 - Use get_document_download_link to provide download links for specific documents
 - Use generate_report to create CSV reports (expense_summary, income_report, budget_analysis, tax_summary)
 - When a user uploads a document, acknowledge it and offer to categorize or discuss it
-- When providing download links, format them as clickable markdown: [Download filename](url)`
+- When providing download links, format them as clickable markdown: [Download filename](url)
+
+## Bank Account Integration
+- Connected bank accounts sync transactions automatically via Plaid
+- Use sync_bank_transactions to pull latest transactions on request
+- Use get_account_balances to show current balances across all connected accounts
+- Use get_investment_holdings to show portfolio positions
+- Synced transactions are auto-categorized but may need manual correction
+- If no accounts are connected, direct Tom to Settings to set up Plaid`
     );
   }
 
@@ -80,6 +89,7 @@ You cannot access or discuss: tax strategy, income details, investment data, CPA
 ## Document Access
 - You can list documents shared with the household using list_documents
 - You can provide download links for accessible documents
-- You cannot access tax documents or generate financial reports — those are owner-only`
+- You cannot access tax documents or generate financial reports — those are owner-only
+- You can view shared account balances but cannot manage bank connections or view investments`
   );
 }
