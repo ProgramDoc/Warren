@@ -1,398 +1,324 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import TopNav from "@/components/layout/TopNav";
+import LeftSidebar from "@/components/layout/LeftSidebar";
+import ChatMessage from "@/components/chat/ChatMessage";
+import ChatInput from "@/components/chat/ChatInput";
 
-interface DashboardData {
-  user: { displayName: string; role: string };
-  lastUpdated: string;
-  income?: {
-    tomUclaYTD: number;
-    tomAiTheiaYTD: number;
-    slYTD: number;
-    totalYTD: number;
-    projectedAnnual: number;
-  };
-  cashPosition?: {
-    monthlyNetIncome: number;
-    monthlyFixedCosts: number;
-    estimatedMonthlySurplus: number;
-  };
-  budgetProgress?: Record<
-    string,
-    { spent: number; budget: number; category: string }
-  >;
-  upcomingBills?: Array<{
-    description: string;
-    amount: string;
-    dueDate: string;
-    urgent?: boolean;
-  }>;
-  taxDeadlines?: Array<{
-    deadline: string;
-    description: string;
-    daysAway: number;
-    status: string;
-  }>;
-  alerts?: Array<{ level: string; message: string }>;
-  properties?: Record<
-    string,
-    {
-      grossRent: number;
-      netMonthly: number;
-      status: string;
-    }
-  >;
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-function Card({
-  title,
-  children,
-  className = "",
-  urgent = false,
-}: {
+interface Conversation {
+  id: string;
   title: string;
-  children: React.ReactNode;
-  className?: string;
-  urgent?: boolean;
-}) {
-  return (
-    <div
-      className={`bg-gray-900 rounded-xl border ${
-        urgent ? "border-red-700" : "border-gray-800"
-      } p-6 ${className}`}
-    >
-      <h3
-        className={`text-sm font-medium ${
-          urgent ? "text-red-400" : "text-gray-400"
-        } mb-4`}
-      >
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
+  updated_at: string;
 }
 
-export default function Dashboard() {
+export default function ChatPage() {
   const router = useRouter();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<{
+    displayName: string;
+    role: string;
+  } | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<
+    string | null
+  >(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [toolStatus, setToolStatus] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const fetchDashboard = useCallback(async () => {
-    try {
-      const sessionRes = await fetch("/api/auth/session");
-      const session = await sessionRes.json();
-
-      if (!session.authenticated) {
-        if (session.needsSetup) {
-          router.push("/setup");
-        } else {
-          router.push("/login");
+  // Check auth
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.authenticated) {
+          router.push(data.needsSetup ? "/setup" : "/login");
+          return;
         }
-        return;
-      }
-
-      const res = await fetch("/api/dashboard");
-      if (res.ok) {
-        setData(await res.json());
-      }
-    } catch {
-      console.error("Failed to fetch dashboard");
-    } finally {
-      setLoading(false);
-    }
+        setUser(data.user);
+      });
   }, [router]);
 
-  useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+  // Load conversations
+  const loadConversations = useCallback(async () => {
+    const res = await fetch("/api/conversations");
+    if (res.ok) {
+      const data = await res.json();
+      setConversations(data.conversations);
+    }
+  }, []);
 
-  async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+  useEffect(() => {
+    if (user) loadConversations();
+  }, [user, loadConversations]);
+
+  // Auto-scroll
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingContent]);
+
+  // Load conversation messages
+  async function selectConversation(id: string) {
+    setActiveConversationId(id);
+    const res = await fetch(`/api/conversations?id=${id}`);
+    if (res.ok) {
+      const data = await res.json();
+      setMessages(data.messages);
+    }
   }
 
-  if (loading) {
+  // Start new chat
+  function startNewChat() {
+    setActiveConversationId(null);
+    setMessages([]);
+    setStreamingContent("");
+  }
+
+  // Delete conversation
+  async function deleteConversation(id: string) {
+    await fetch(`/api/conversations?id=${id}`, { method: "DELETE" });
+    if (activeConversationId === id) {
+      startNewChat();
+    }
+    loadConversations();
+  }
+
+  // Send message
+  async function sendMessage(content: string) {
+    if (isStreaming) return;
+
+    // Add user message to UI
+    const userMsg: Message = {
+      id: "temp-" + Date.now(),
+      role: "user",
+      content,
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setIsStreaming(true);
+    setStreamingContent("");
+    setToolStatus(null);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: activeConversationId,
+          message: content,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Chat failed");
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        let eventType = "";
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7);
+          } else if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6));
+
+            switch (eventType) {
+              case "token":
+                fullText += data.text;
+                setStreamingContent(fullText);
+                break;
+              case "tool_use":
+                setToolStatus(`Querying ${data.tool.replace(/_/g, " ")}...`);
+                break;
+              case "tool_result":
+                setToolStatus(null);
+                break;
+              case "title":
+                // Update conversation title in sidebar
+                setConversations((prev) =>
+                  prev.map((c) =>
+                    c.id === data.conversationId
+                      ? { ...c, title: data.title }
+                      : c
+                  )
+                );
+                break;
+              case "done":
+                if (!activeConversationId && data.conversationId) {
+                  setActiveConversationId(data.conversationId);
+                }
+                break;
+              case "error":
+                console.error("Stream error:", data.error);
+                break;
+            }
+          }
+        }
+      }
+
+      // Add assistant message
+      if (fullText) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: "msg-" + Date.now(),
+            role: "assistant",
+            content: fullText,
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Chat error:", error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: "err-" + Date.now(),
+          role: "assistant",
+          content: `Sorry, something went wrong: ${error instanceof Error ? error.message : "Unknown error"}`,
+        },
+      ]);
+    } finally {
+      setIsStreaming(false);
+      setStreamingContent("");
+      setToolStatus(null);
+      loadConversations();
+    }
+  }
+
+  if (!user) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="text-gray-400">Loading dashboard...</div>
+        <div className="text-gray-400">Loading...</div>
       </div>
     );
   }
 
-  if (!data) return null;
-
-  const isOwner = data.user.role === "owner";
-
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Warren</h1>
-            <p className="text-sm text-gray-400">
-              {data.user.displayName} &middot;{" "}
-              {isOwner ? "Owner" : "Household"}
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-gray-500">
-              Updated {new Date(data.lastUpdated).toLocaleTimeString()}
-            </span>
-            <button
-              onClick={() => router.push("/settings")}
-              className="text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              Settings
-            </button>
-            <button
-              onClick={handleLogout}
-              className="text-sm text-gray-400 hover:text-white transition-colors"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="h-screen flex flex-col bg-gray-950 text-white overflow-hidden">
+      <TopNav userName={user.displayName} onNewChat={startNewChat} />
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Alerts */}
-        {data.alerts && data.alerts.length > 0 && (
-          <div className="mb-8 space-y-3">
-            {data.alerts.map((alert, i) => (
-              <div
-                key={i}
-                className={`px-4 py-3 rounded-lg border text-sm ${
-                  alert.level === "urgent"
-                    ? "bg-red-950 border-red-800 text-red-300"
-                    : alert.level === "warning"
-                    ? "bg-yellow-950 border-yellow-800 text-yellow-300"
-                    : "bg-blue-950 border-blue-800 text-blue-300"
-                }`}
-              >
-                <span className="font-medium uppercase text-xs mr-2">
-                  {alert.level}
-                </span>
-                {alert.message}
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar */}
+        <LeftSidebar
+          conversations={conversations}
+          activeId={activeConversationId}
+          onSelect={selectConversation}
+          onDelete={deleteConversation}
+          onNewChat={startNewChat}
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Cash Position (owner only) */}
-          {isOwner && data.cashPosition && (
-            <Card title="CASH POSITION">
-              <div className="space-y-3">
-                <div className="flex justify-between items-baseline">
-                  <span className="text-gray-400 text-sm">Monthly Net Income</span>
-                  <span className="text-2xl font-bold text-green-400">
-                    {formatCurrency(data.cashPosition.monthlyNetIncome)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-baseline">
-                  <span className="text-gray-400 text-sm">Monthly Fixed Costs</span>
-                  <span className="text-lg text-red-400">
-                    {formatCurrency(data.cashPosition.monthlyFixedCosts)}
-                  </span>
-                </div>
-                <div className="border-t border-gray-800 pt-3 flex justify-between items-baseline">
-                  <span className="text-gray-300 text-sm font-medium">
-                    Est. Surplus
-                  </span>
-                  <span className="text-xl font-bold text-emerald-400">
-                    {formatCurrency(data.cashPosition.estimatedMonthlySurplus)}
-                  </span>
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* Income YTD (owner only) */}
-          {isOwner && data.income && (
-            <Card title="INCOME YTD (2026)">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-400 text-sm">Tom — UCLA</span>
-                  <span className="text-white">
-                    {formatCurrency(data.income.tomUclaYTD)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400 text-sm">Tom — AiTheia</span>
-                  <span className="text-white">
-                    {formatCurrency(data.income.tomAiTheiaYTD)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400 text-sm">SL</span>
-                  <span className="text-white">
-                    {formatCurrency(data.income.slYTD)}
-                  </span>
-                </div>
-                <div className="border-t border-gray-800 pt-2 flex justify-between">
-                  <span className="text-gray-300 text-sm font-medium">Total YTD</span>
-                  <span className="text-xl font-bold text-white">
-                    {formatCurrency(data.income.totalYTD)}
-                  </span>
-                </div>
-                <div className="text-xs text-gray-500 text-right">
-                  Projected annual: {formatCurrency(data.income.projectedAnnual)}
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* Tax Deadlines (owner only) */}
-          {isOwner && data.taxDeadlines && (
-            <Card
-              title="TAX DEADLINES"
-              urgent={data.taxDeadlines.some((d) => d.daysAway <= 7)}
-            >
-              <div className="space-y-3">
-                {data.taxDeadlines.slice(0, 4).map((deadline, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start justify-between gap-2"
-                  >
-                    <div>
-                      <p className="text-sm text-white">
-                        {deadline.description}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {deadline.deadline}
-                      </p>
-                    </div>
-                    <span
-                      className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${
-                        deadline.status === "NOT PAID"
-                          ? "bg-red-900 text-red-300"
-                          : deadline.status === "EXTENSION FILED"
-                          ? "bg-yellow-900 text-yellow-300"
-                          : "bg-gray-800 text-gray-400"
-                      }`}
-                    >
-                      {deadline.daysAway <= 7
-                        ? `${deadline.daysAway}d`
-                        : deadline.status}
+        {/* Center Chat Pane */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-6">
+            <div className="max-w-3xl mx-auto">
+              {messages.length === 0 && !isStreaming && (
+                <div className="text-center mt-[20vh]">
+                  <div className="w-16 h-16 rounded-full bg-emerald-900/50 flex items-center justify-center mx-auto mb-4">
+                    <span className="text-emerald-400 text-2xl font-bold">
+                      W
                     </span>
                   </div>
-                ))}
-              </div>
-            </Card>
-          )}
+                  <h2 className="text-xl font-semibold text-gray-300 mb-2">
+                    How can I help with your finances?
+                  </h2>
+                  <p className="text-gray-500 text-sm max-w-md mx-auto">
+                    Ask about your budget, income, tax deadlines, cash flow, or
+                    log an expense. I can pull up your financial data and provide
+                    analysis.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2 mt-6">
+                    {[
+                      "What's my budget status?",
+                      "Show my income YTD",
+                      "Upcoming tax deadlines",
+                      "What are my recurring bills?",
+                    ].map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => sendMessage(q)}
+                        className="px-3 py-1.5 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 text-xs transition-colors border border-gray-700"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          {/* Budget Progress (shared) */}
-          {data.budgetProgress && (
-            <Card title="BUDGET PROGRESS (MTD)">
-              <div className="space-y-4">
-                {Object.values(data.budgetProgress).map((item, i) => {
-                  const pct = Math.round((item.spent / item.budget) * 100);
-                  return (
-                    <div key={i}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-400">{item.category}</span>
-                        <span className="text-gray-300">
-                          {formatCurrency(item.spent)} /{" "}
-                          {formatCurrency(item.budget)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-800 rounded-full h-2">
-                        <div
-                          className={`h-2 rounded-full ${
-                            pct >= 100
-                              ? "bg-red-500"
-                              : pct >= 80
-                              ? "bg-yellow-500"
-                              : "bg-green-500"
-                          }`}
-                          style={{ width: `${Math.min(pct, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          )}
+              {messages.map((msg) => (
+                <ChatMessage
+                  key={msg.id}
+                  role={msg.role}
+                  content={msg.content}
+                />
+              ))}
 
-          {/* Upcoming Bills (shared) */}
-          {data.upcomingBills && (
-            <Card
-              title="UPCOMING BILLS"
-              urgent={data.upcomingBills.some((b) => b.urgent)}
-            >
-              <div className="space-y-3">
-                {data.upcomingBills.map((bill, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start justify-between gap-2"
+              {/* Streaming message */}
+              {isStreaming && streamingContent && (
+                <ChatMessage
+                  role="assistant"
+                  content={streamingContent}
+                  isStreaming
+                />
+              )}
+
+              {/* Tool status */}
+              {toolStatus && (
+                <div className="flex items-center gap-2 text-emerald-400 text-xs mb-4">
+                  <svg
+                    className="w-4 h-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
                   >
-                    <div>
-                      <p
-                        className={`text-sm ${
-                          bill.urgent ? "text-red-300" : "text-white"
-                        }`}
-                      >
-                        {bill.description}
-                      </p>
-                      <p className="text-xs text-gray-500">{bill.dueDate}</p>
-                    </div>
-                    <span
-                      className={`text-sm font-medium ${
-                        bill.urgent ? "text-red-400" : "text-gray-300"
-                      }`}
-                    >
-                      {bill.amount}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  {toolStatus}
+                </div>
+              )}
 
-          {/* Properties (owner only) */}
-          {isOwner && data.properties && (
-            <Card title="RENTAL PROPERTIES">
-              <div className="space-y-4">
-                {Object.entries(data.properties).map(([name, prop]) => (
-                  <div key={name} className="border-b border-gray-800 pb-3 last:border-0 last:pb-0">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <span className="text-sm font-medium text-white capitalize">
-                        {name}
-                      </span>
-                      <span
-                        className={`text-sm font-bold ${
-                          prop.netMonthly >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {formatCurrency(prop.netMonthly)}/mo
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs text-gray-500">
-                      <span>Rent: {formatCurrency(prop.grossRent)}/mo</span>
-                      <span>{prop.status}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+
+          {/* Input */}
+          <ChatInput onSend={sendMessage} disabled={isStreaming} />
         </div>
-      </main>
+      </div>
     </div>
   );
 }

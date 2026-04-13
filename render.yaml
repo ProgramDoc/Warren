@@ -31,6 +31,8 @@ services:
         sync: false
       - key: HOUSEHOLD_PASSWORD
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
 
 databases:
   - name: warren-db

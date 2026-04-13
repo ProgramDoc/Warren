@@ -239,6 +239,112 @@ export async function getActiveAlerts() {
   );
 }
 
+// --- Conversation operations ---
+
+export interface Conversation {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  role: "user" | "assistant";
+  content: string;
+  tool_calls: unknown | null;
+  token_usage: unknown | null;
+  created_at: string;
+}
+
+export async function createConversation(
+  userId: string,
+  title?: string
+): Promise<Conversation> {
+  const result = await queryOne<Conversation>(
+    "INSERT INTO conversations (user_id, title) VALUES ($1, $2) RETURNING *",
+    [userId, title || "New Conversation"]
+  );
+  return result!;
+}
+
+export async function getConversations(
+  userId: string,
+  limit = 50
+): Promise<Conversation[]> {
+  return query<Conversation>(
+    "SELECT * FROM conversations WHERE user_id = $1 ORDER BY updated_at DESC LIMIT $2",
+    [userId, limit]
+  );
+}
+
+export async function getConversation(
+  id: string,
+  userId: string
+): Promise<Conversation | null> {
+  return queryOne<Conversation>(
+    "SELECT * FROM conversations WHERE id = $1 AND user_id = $2",
+    [id, userId]
+  );
+}
+
+export async function updateConversationTitle(
+  id: string,
+  title: string
+): Promise<void> {
+  await execute(
+    "UPDATE conversations SET title = $1, updated_at = NOW() WHERE id = $2",
+    [title, id]
+  );
+}
+
+export async function touchConversation(id: string): Promise<void> {
+  await execute("UPDATE conversations SET updated_at = NOW() WHERE id = $1", [id]);
+}
+
+export async function deleteConversation(
+  id: string,
+  userId: string
+): Promise<void> {
+  await execute(
+    "DELETE FROM conversations WHERE id = $1 AND user_id = $2",
+    [id, userId]
+  );
+}
+
+export async function createMessage(
+  conversationId: string,
+  role: "user" | "assistant",
+  content: string,
+  toolCalls?: unknown,
+  tokenUsage?: unknown
+): Promise<Message> {
+  const result = await queryOne<Message>(
+    `INSERT INTO messages (conversation_id, role, content, tool_calls, token_usage)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [
+      conversationId,
+      role,
+      content,
+      toolCalls ? JSON.stringify(toolCalls) : null,
+      tokenUsage ? JSON.stringify(tokenUsage) : null,
+    ]
+  );
+  return result!;
+}
+
+export async function getMessages(
+  conversationId: string,
+  limit = 50
+): Promise<Message[]> {
+  return query<Message>(
+    "SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC LIMIT $2",
+    [conversationId, limit]
+  );
+}
+
 export async function getBudgetProgress(year: number, month: number) {
   return query(
     `SELECT
