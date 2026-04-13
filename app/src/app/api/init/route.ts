@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDb, getUserCount, getUserByEmail, createUser } from "@/lib/db";
+import { initDb, getUserCount, getUserByEmail, createUser, query } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
+import fs from "fs";
+import path from "path";
 
 // POST: Initialize database schema + create user accounts
 // Protected by a secret key — only run once during setup
@@ -41,13 +43,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Run seed data
+    let seeded = false;
+    try {
+      const seedPath = path.join(process.cwd(), "src", "lib", "db", "seed.sql");
+      const seedSql = fs.readFileSync(seedPath, "utf-8");
+      // Split by semicolons and run each statement
+      const statements = seedSql
+        .split(";")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0 && !s.startsWith("--"));
+      for (const stmt of statements) {
+        await query(stmt + ";");
+      }
+      seeded = true;
+    } catch (e) {
+      console.error("Seed error (non-fatal):", e);
+    }
+
     const userCount = await getUserCount();
 
     return NextResponse.json({
       success: true,
-      message: "Database initialized",
+      message: "Database initialized and seeded",
       userCount,
       usersCreated,
+      seeded,
     });
   } catch (error) {
     console.error("Init error:", error);
