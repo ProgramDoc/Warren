@@ -26,6 +26,6 @@ services:
 
 databases:
   - name: warren-db
-    plan: starter
+    plan: basic
     region: oregon
     postgresMajorVersion: "16"
