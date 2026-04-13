@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS users (
   display_name TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK(role IN ('owner', 'household')),
+  totp_secret TEXT,               -- AES-256-GCM encrypted TOTP secret
+  totp_enabled BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

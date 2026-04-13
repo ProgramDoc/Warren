@@ -151,6 +151,12 @@ export default function Dashboard() {
               Updated {new Date(data.lastUpdated).toLocaleTimeString()}
             </span>
             <button
+              onClick={() => router.push("/settings")}
+              className="text-sm text-gray-400 hover:text-white transition-colors"
+            >
+              Settings
+            </button>
+            <button
               onClick={handleLogout}
               className="text-sm text-gray-400 hover:text-white transition-colors"
             >

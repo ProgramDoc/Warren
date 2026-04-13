@@ -46,6 +46,8 @@ interface User {
   display_name: string;
   password_hash: string;
   role: string;
+  totp_secret: string | null;
+  totp_enabled: boolean;
 }
 
 export async function getUserCount(): Promise<number> {
@@ -74,6 +76,30 @@ export async function createUser(
     [email, displayName, passwordHash, role]
   );
   return result!;
+}
+
+export async function setTotpSecret(
+  userId: string,
+  encryptedSecret: string
+): Promise<void> {
+  await execute(
+    "UPDATE users SET totp_secret = $1 WHERE id = $2",
+    [encryptedSecret, userId]
+  );
+}
+
+export async function enableTotp(userId: string): Promise<void> {
+  await execute(
+    "UPDATE users SET totp_enabled = true WHERE id = $1",
+    [userId]
+  );
+}
+
+export async function disableTotp(userId: string): Promise<void> {
+  await execute(
+    "UPDATE users SET totp_enabled = false, totp_secret = NULL WHERE id = $1",
+    [userId]
+  );
 }
 
 // --- Session operations ---
