@@ -18,19 +18,13 @@ export default function LoginPage() {
     fetch("/api/auth/session")
       .then((r) => r.json())
       .then((data) => {
-        if (data.authenticated) {
-          router.push("/");
-        } else if (data.needsSetup) {
-          router.push("/setup");
-        }
+        if (data.authenticated) router.push("/");
+        else if (data.needsSetup) router.push("/setup");
       });
   }, [router]);
 
-  // Auto-focus TOTP input when step changes
   useEffect(() => {
-    if (step === "totp") {
-      totpInputRef.current?.focus();
-    }
+    if (step === "totp") totpInputRef.current?.focus();
   }, [step]);
 
   async function handleLogin(e: React.FormEvent) {
@@ -40,9 +34,7 @@ export default function LoginPage() {
 
     try {
       const payload: Record<string, string> = { email, password };
-      if (step === "totp" && totpCode) {
-        payload.totpCode = totpCode;
-      }
+      if (step === "totp" && totpCode) payload.totpCode = totpCode;
 
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -51,12 +43,8 @@ export default function LoginPage() {
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Login failed");
 
-      if (!res.ok) {
-        throw new Error(data.error || "Login failed");
-      }
-
-      // 2FA required — show TOTP input
       if (data.requiresTotp) {
         setPendingToken(data.pendingToken);
         setStep("totp");
@@ -67,58 +55,63 @@ export default function LoginPage() {
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
-      if (step === "totp") {
-        setTotpCode("");
-      }
+      if (step === "totp") setTotpCode("");
     } finally {
       setLoading(false);
     }
   }
 
-  function handleBack() {
-    setStep("credentials");
-    setTotpCode("");
-    setPendingToken("");
-    setError("");
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950">
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--surface)" }}>
       <div className="w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">Warren</h1>
-          <p className="text-gray-400 mt-2">Financial Dashboard</p>
+        <div className="text-center mb-10">
+          <div className="w-14 h-14 rounded-2xl gradient-primary flex items-center justify-center mx-auto mb-5">
+            <span className="text-white text-xl font-bold" style={{ fontFamily: "var(--font-display)" }}>W</span>
+          </div>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-display)", color: "var(--primary)" }}>
+            Warren
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: "var(--on-surface-variant)" }}>Financial Advisor</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-5">
           {step === "credentials" && (
             <>
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-300">
+                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: "var(--on-surface-variant)" }}>
                   Email
                 </label>
                 <input
-                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 block w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="tom@example.com"
+                  className="w-full rounded-lg px-4 py-3 text-sm focus:outline-none"
+                  style={{
+                    background: "var(--surface-container-high)",
+                    color: "var(--on-surface)",
+                    border: "none",
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px rgba(183, 196, 255, 0.3)")}
+                  onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
                   required
                 />
               </div>
-
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-300">
+                <label className="block text-xs font-medium mb-2 uppercase tracking-wider" style={{ color: "var(--on-surface-variant)" }}>
                   Password
                 </label>
                 <input
-                  id="password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 block w-full rounded-lg bg-gray-800 border border-gray-700 text-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter your password"
+                  className="w-full rounded-lg px-4 py-3 text-sm focus:outline-none"
+                  style={{
+                    background: "var(--surface-container-high)",
+                    color: "var(--on-surface)",
+                    border: "none",
+                  }}
+                  onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px rgba(183, 196, 255, 0.3)")}
+                  onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
                   required
                 />
               </div>
@@ -126,42 +119,38 @@ export default function LoginPage() {
           )}
 
           {step === "totp" && (
-            <>
-              <div className="text-center mb-2">
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-900/50 mb-3">
-                  <svg className="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-                <p className="text-gray-300 text-sm">
-                  Enter the 6-digit code from your authenticator app
-                </p>
-                <p className="text-gray-500 text-xs mt-1">
-                  Duo Mobile, Microsoft Authenticator, or Google Authenticator
-                </p>
+            <div className="text-center">
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-4" style={{ background: "var(--surface-container-high)" }}>
+                <svg className="w-6 h-6" fill="none" stroke="var(--primary)" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
               </div>
-
-              <div>
-                <input
-                  ref={totpInputRef}
-                  id="totpCode"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={6}
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
-                  className="block w-full rounded-lg bg-gray-800 border border-gray-700 text-white text-center text-2xl tracking-[0.5em] px-4 py-4 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
-                  placeholder="000000"
-                  required
-                  autoComplete="one-time-code"
-                />
-              </div>
-            </>
+              <p className="text-sm mb-1" style={{ color: "var(--on-surface)" }}>Two-factor authentication</p>
+              <p className="text-xs mb-6" style={{ color: "var(--on-surface-muted)" }}>Enter the 6-digit code from your authenticator app</p>
+              <input
+                ref={totpInputRef}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+                className="w-full rounded-lg px-4 py-4 text-center text-2xl tracking-[0.5em] font-mono focus:outline-none"
+                style={{
+                  background: "var(--surface-container-high)",
+                  color: "var(--on-surface)",
+                  border: "none",
+                }}
+                onFocus={(e) => (e.currentTarget.style.boxShadow = "0 0 0 2px rgba(183, 196, 255, 0.3)")}
+                onBlur={(e) => (e.currentTarget.style.boxShadow = "none")}
+                autoComplete="one-time-code"
+                required
+              />
+            </div>
           )}
 
           {error && (
-            <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg text-sm">
+            <div className="rounded-lg px-4 py-3 text-sm" style={{ background: "rgba(255, 123, 123, 0.1)", color: "var(--accent-red)" }}>
               {error}
             </div>
           )}
@@ -169,7 +158,8 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading || (step === "credentials" && (!email || !password)) || (step === "totp" && totpCode.length !== 6)}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+            className="w-full gradient-primary font-medium py-3 px-4 rounded-lg text-sm transition-all hover:opacity-90 disabled:opacity-30"
+            style={{ color: "var(--on-primary-fixed)" }}
           >
             {loading ? "Verifying..." : step === "totp" ? "Verify" : "Sign In"}
           </button>
@@ -177,18 +167,17 @@ export default function LoginPage() {
           {step === "totp" && (
             <button
               type="button"
-              onClick={handleBack}
-              className="w-full text-gray-400 hover:text-gray-300 text-sm py-2 transition-colors"
+              onClick={() => { setStep("credentials"); setTotpCode(""); setError(""); }}
+              className="w-full text-xs py-2 transition-colors"
+              style={{ color: "var(--on-surface-muted)" }}
             >
               Back to sign in
             </button>
           )}
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-500">
-          {step === "credentials"
-            ? "Encrypted with AES-256-GCM. Passwords hashed with bcrypt."
-            : "Two-factor authentication protects your account."}
+        <p className="mt-8 text-center text-[10px] uppercase tracking-widest" style={{ color: "var(--on-surface-muted)" }}>
+          AES-256-GCM Encrypted
         </p>
       </div>
     </div>

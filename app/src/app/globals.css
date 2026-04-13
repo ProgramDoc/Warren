@@ -1,26 +1,112 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surface Hierarchy */
+  --surface: #10131a;
+  --surface-container-lowest: #0c0e14;
+  --surface-container-low: #191c22;
+  --surface-container: #1d2026;
+  --surface-container-high: #262930;
+  --surface-container-highest: #32353c;
+
+  /* Primary */
+  --primary: #b7c4ff;
+  --primary-container: #0052ff;
+  --on-primary: #10131a;
+  --on-primary-fixed: #ffffff;
+
+  /* Text */
+  --on-surface: #e4e4e8;
+  --on-surface-variant: #8b8d95;
+  --on-surface-muted: #5a5c64;
+
+  /* Accent */
+  --accent-green: #7ae8a0;
+  --accent-red: #ff7b7b;
+  --accent-amber: #ffd97a;
+  --accent-blue: #7ab8ff;
+
+  /* Outline */
+  --outline-variant: rgba(139, 141, 149, 0.15);
+
+  /* Ambient shadow */
+  --shadow-ambient: 0 4px 40px rgba(11, 28, 48, 0.06);
+
+  /* Fonts */
+  --font-display: 'Manrope', var(--font-geist-sans), system-ui, sans-serif;
+  --font-body: 'Inter', var(--font-geist-sans), system-ui, sans-serif;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-background: var(--surface);
+  --color-foreground: var(--on-surface);
+  --font-sans: var(--font-body);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-container-highest);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--on-surface-muted);
+}
+
+/* Selection */
+::selection {
+  background: rgba(183, 196, 255, 0.2);
+  color: var(--on-surface);
+}
+
+/* Gradient utility */
+.gradient-primary {
+  background: linear-gradient(135deg, var(--primary), var(--primary-container));
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(29, 32, 38, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Ghost border */
+.ghost-border {
+  box-shadow: inset 0 0 0 1px var(--outline-variant);
+}
+
+/* AI thinking gradient animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.ai-thinking {
+  background: linear-gradient(90deg, var(--surface-container) 25%, var(--surface-container-high) 50%, var(--surface-container) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* Cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.cursor-blink {
+  animation: blink 1s step-end infinite;
 }

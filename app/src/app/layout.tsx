@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Warren — Financial Dashboard",
-  description: "Secure financial advisor dashboard for Tom & SL",
+  title: "Warren — Financial Advisor",
+  description: "AI-powered financial advisor for Tom & SL",
 };
 
 export default function RootLayout({
@@ -25,9 +25,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col" style={{ background: "var(--surface)", color: "var(--on-surface)" }}>{children}</body>
     </html>
   );
 }

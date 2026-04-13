@@ -11,7 +11,6 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize textarea
   useEffect(() => {
     const textarea = textareaRef.current;
     if (textarea) {
@@ -25,7 +24,6 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setValue("");
-    // Reset height
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -39,39 +37,49 @@ export default function ChatInput({ onSend, disabled }: ChatInputProps) {
   }
 
   return (
-    <div className="border-t border-gray-800 bg-gray-950 p-4">
-      <div className="max-w-3xl mx-auto flex items-end gap-3">
-        <div className="flex-1 relative">
+    <div
+      className="absolute bottom-0 left-0 w-full p-6"
+      style={{
+        background: "linear-gradient(to top, var(--surface) 60%, transparent)",
+      }}
+    >
+      <div className="max-w-3xl mx-auto space-y-4">
+        {/* Main Input */}
+        <div className="relative group">
           <textarea
             ref={textareaRef}
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask Warren about your finances..."
+            placeholder="Ask Warren anything about your finances..."
             disabled={disabled}
             rows={1}
-            className="w-full resize-none rounded-xl bg-gray-800 border border-gray-700 text-white px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent placeholder-gray-500 text-sm disabled:opacity-50"
+            className="w-full resize-none rounded-full py-4 pl-6 pr-14 text-sm focus:outline-none disabled:opacity-50"
+            style={{
+              background: "var(--surface-container-highest)",
+              color: "var(--on-surface)",
+              border: "none",
+              boxShadow: "0 4px 40px rgba(11, 28, 48, 0.2)",
+            }}
+            onFocus={(e) =>
+              (e.currentTarget.style.boxShadow =
+                "0 0 0 2px rgba(183, 196, 255, 0.3), 0 4px 40px rgba(11, 28, 48, 0.2)")
+            }
+            onBlur={(e) =>
+              (e.currentTarget.style.boxShadow =
+                "0 4px 40px rgba(11, 28, 48, 0.2)")
+            }
           />
-        </div>
-        <button
-          onClick={handleSubmit}
-          disabled={disabled || !value.trim()}
-          className="shrink-0 w-10 h-10 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-500 text-white flex items-center justify-center transition-colors"
-        >
-          <svg
-            className="w-5 h-5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          <button
+            onClick={handleSubmit}
+            disabled={disabled || !value.trim()}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 gradient-primary rounded-full flex items-center justify-center transition-transform hover:scale-105 active:scale-95 disabled:opacity-30 disabled:hover:scale-100"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 19V5m0 0l-7 7m7-7l7 7"
-            />
-          </svg>
-        </button>
+            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );
