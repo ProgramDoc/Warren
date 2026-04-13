@@ -36,7 +36,7 @@ const HOUSEHOLD_PATHS = [
 ];
 
 function getJwtSecret(): Uint8Array {
-  const secret = process.env.ENCRYPTION_KEY || "dev-secret-change-me";
+  const secret = process.env.JWT_SECRET || process.env.ENCRYPTION_KEY || "dev-secret-change-me";
   return new TextEncoder().encode(secret);
 }
 
